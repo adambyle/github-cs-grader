@@ -1,0 +1,6 @@
+# Course folder: keep it private, it holds names, emails and answers.
+.DS_Store
+__pycache__/
+node_modules/
+*.log.tmp
+distribution-*.csv

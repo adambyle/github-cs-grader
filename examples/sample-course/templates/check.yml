@@ -1,0 +1,58 @@
+name: Check
+
+# {{title}} ({{course}})
+#
+# The workflow for a HAND-GRADED assignment, shipped only because course.json
+# has "tick_on_manual": true. There are no tests to run, so all this can
+# confirm is that every source file loads without crashing.
+#
+# Be clear with students about what the tick means here: "your code parses",
+# not "your work is right". A red X on this workflow is a syntax error, nothing
+# more, and a green tick says nothing about the grade.
+#
+# The runs-on, container and image lines follow the same three rules as
+# autograde.yml; read the comments there. This file was rendered from
+# templates/check.yml by `{{course}} template`.
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: {{runner}}
+    container:
+      image: {{image}}
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out your code
+        uses: actions/checkout@v4
+
+      - name: Check that every source file loads
+        run: |
+          status=0
+          if command -v node >/dev/null 2>&1; then
+            while IFS= read -r f; do
+              if node --check "$f"; then echo "ok    $f"; else echo "FAIL  $f"; status=1; fi
+            done < <(find . -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) -not -path './node_modules/*' -not -path './.git/*' | sort)
+          fi
+          if command -v python3 >/dev/null 2>&1; then
+            while IFS= read -r f; do
+              if python3 -m py_compile "$f"; then echo "ok    $f"; else echo "FAIL  $f"; status=1; fi
+            done < <(find . -type f -name '*.py' -not -path './.git/*' | sort)
+          fi
+          {
+            echo "## ${GITHUB_REPOSITORY##*/}"
+            echo
+            if [ "$status" = 0 ]; then
+              echo "Every source file loads. This assignment is graded by hand; the tick only says the code parses."
+            else
+              echo "At least one file does not load. See the step log above. This assignment is graded by hand; fix the syntax error so your instructor can run your work."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status

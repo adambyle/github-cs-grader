@@ -1,0 +1,11 @@
+{
+  "course": "cs108",
+  "title": "Web Programming",
+  "org": "26fa-cs108",
+  "runner": "runners-26fa-cs108",
+  "image": "node:22",
+  "build": "npm test",
+  "tick_on_manual": false,
+  "grading": "~/cs108-grading",
+  "grader_default": "js"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "{{course}}-{{assignment}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "{{title}}",
+  "scripts": {
+    "test": "node test.js"
+  }
+}

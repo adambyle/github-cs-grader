@@ -1,0 +1,111 @@
+name: Autograde
+
+# {{title}} ({{course}})
+#
+# This workflow ships in every assignment template, so every student
+# repository is born with a copy. Nobody runs it by hand: it runs itself on
+# every push to main.
+#
+# WHAT IT IS FOR
+#   The green tick, plus a readable summary on the run page. It runs the SAME
+#   test command a student runs locally. That is formative feedback only. The
+#   mark of record comes from `{{course}} marks`, run by the instructor on the
+#   instructor's machine against the instructor's own copies of the tests.
+#
+#   The tick is disposable. If the runners break, students lose a tick and
+#   nothing else: local tests still work and marks still happen.
+#
+# THREE LINES THAT ARE NOT NEGOTIABLE (each learned by failing, 2026-08-14)
+#
+#   runs-on    Actions Runner Controller registers its runners with NO labels,
+#              so the scale-set name is the only thing that routes a job. A job
+#              asking for [self-hosted, Linux, X64] matches nothing and queues
+#              forever with no error message. The name below comes from
+#              course.json ("runner") and is changed with `{{course}} config runner`.
+#
+#   container  ARC in Kubernetes mode REJECTS any job without one.
+#
+#   image      The Kubernetes hook IGNORES the container `user` and `options`
+#              settings, so the image must default to root or actions/checkout
+#              fails with EACCES writing to /__w/_temp. The official node images
+#              run as root and are fine. This one comes from course.json ("image").
+#
+# AND ONE THING IT DELIBERATELY DOES NOT DO
+#   Nothing here calls gh, publishes a release, or posts a commit status. The
+#   job's own success or failure IS the tick. Doing more than that is exactly
+#   what broke the platform autograder this system replaced.
+#
+# NETWORK
+#   The runner pods have no network. `npm install` here WILL fail. Test suites
+#   are built on node --test and node:assert with zero dependencies for
+#   precisely this reason.
+#
+# This file was rendered from templates/autograde.yml by `{{course}} template`.
+# Edit the template in the course folder, not the copy in a repository, and
+# re-push with `{{course}} patch <assignment> --files .github/workflows/autograde.yml --go`.
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: {{runner}}
+    container:
+      image: {{image}}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out your code
+        uses: actions/checkout@v4
+
+      - name: Run the tests
+        id: tests
+        # pipefail so the step still fails when the tests fail; tee alone
+        # would hide the failure behind its own exit status.
+        run: |
+          set -o pipefail
+          {{build}} 2>&1 | tee /tmp/course-test-output.txt
+
+      # always() so a failing run, the interesting case, still gets a summary.
+      # Written in plain shell so it works in any image, node or otherwise.
+      - name: Summary
+        if: always()
+        run: |
+          out=/tmp/course-test-output.txt
+          esc=$(printf '\033')
+          clean=/tmp/course-test-clean.txt
+          if [ -f "$out" ]; then sed -E "s/${esc}\[[0-9;]*m//g" "$out" > "$clean"; else : > "$clean"; fi
+          repo="${GITHUB_REPOSITORY##*/}"
+          {
+            echo "## ${repo:-Automated check}"
+            echo
+            score=$(grep -oE 'Results:[[:space:]]*[0-9]+[[:space:]]*/[[:space:]]*[0-9]+[[:space:]]*passed' "$clean" | tail -1)
+            if [ -n "$score" ]; then
+              got=$(echo "$score" | sed -E 's/Results:[[:space:]]*([0-9]+).*/\1/')
+              total=$(echo "$score" | sed -E 's/.*\/[[:space:]]*([0-9]+).*/\1/')
+              if [ "$got" = "$total" ]; then echo "### $got / $total checks passed 🎉"; else echo "### $got / $total checks passed"; fi
+            elif [ ! -s "$clean" ]; then
+              echo "The tests did not run. Check the step above: the code has to load before anything can be tested."
+            else
+              echo "The tests did not report a score. Check the log above."
+            fi
+            echo
+            fails=$(awk '/^[[:space:]]*FAIL[[:space:]]/ { sub(/^[[:space:]]*FAIL[[:space:]]*/, ""); label=$0; hint=""; if ((getline nxt) > 0 && nxt ~ /Hint:/) { sub(/.*Hint:[[:space:]]*/, "", nxt); hint=nxt } if (hint != "") print "- **" label "**<br>" hint; else print "- **" label "**" }' "$clean")
+            if [ -n "$fails" ]; then
+              n=$(printf '%s\n' "$fails" | wc -l | tr -d ' ')
+              echo "<details open><summary><b>$n check(s) failed</b></summary>"
+              echo
+              printf '%s\n' "$fails"
+              echo
+              echo "</details>"
+              echo
+            fi
+            echo "---"
+            echo
+            echo "Run \`{{build}}\` locally for the same checks with full output. This tick is a convenience; it is not your grade."
+          } >> "$GITHUB_STEP_SUMMARY"

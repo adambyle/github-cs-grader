@@ -1,0 +1,9 @@
+{
+  "name": "cs108-a02",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hello, graded in Python",
+  "scripts": {
+    "test": "node test.js"
+  }
+}

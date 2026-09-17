@@ -1,0 +1,9 @@
+{
+  "title": "Hello, graded in JavaScript",
+  "kind": "auto",
+  "grader": "autograder.js",
+  "restore": [
+    "test.js",
+    "package.json"
+  ]
+}

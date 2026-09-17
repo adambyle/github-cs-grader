@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# The Claude desktop app writes session outputs here; not part of the toolkit.
+Claude outputs/

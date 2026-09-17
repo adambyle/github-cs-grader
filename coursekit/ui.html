@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>course</title>
+<!--
+  The whole UI, in one file. Plain HTML and a little JavaScript, no build
+  step, no framework, served by coursekit/verbs/ui.py.
+
+  THE ONE RULE: every button maps to exactly one command, shows that command
+  as text, and does nothing the command line cannot do. The page never
+  computes anything the harness does not; it renders /api/state, and a
+  button POSTs the command string it shows to /api/run. A command with --go
+  is only sent after the preview has been shown and confirmed.
+
+  THREE SCREENS: Status, Assignment, Settings. Do not add a fourth. No
+  charts, no per-student page, no code viewer, no in-browser editing of
+  assignments or rosters, no accounts.
+-->
+<style>
+  :root { --ink:#1f2328; --dim:#6b7280; --line:#e5e7eb; --bg:#fff; --soft:#f6f8fa;
+          --ok:#1a7f37; --warn:#9a6700; --stop:#cf222e; --link:#0969da; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+         color:var(--ink); background:var(--bg); }
+  header { display:flex; align-items:baseline; gap:18px; padding:12px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0; }
+  header nav a { margin-right:14px; color:var(--link); text-decoration:none; }
+  header nav a.on { font-weight:600; text-decoration:underline; }
+  header .meta { color:var(--dim); margin-left:auto; font-size:12px; }
+  main { padding:18px 20px; max-width:1100px; }
+  table { border-collapse:collapse; width:100%; margin:8px 0 18px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:12px; }
+  tr.row:hover { background:var(--soft); cursor:pointer; }
+  code, .cmd { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .cmd { background:var(--soft); border:1px solid var(--line); border-radius:4px; padding:2px 6px; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .stop { color:var(--stop); } .dim { color:var(--dim); }
+  .sev { display:inline-block; min-width:44px; font-weight:700; font-size:11px; letter-spacing:.04em; }
+  .action { padding:8px 0; border-bottom:1px solid var(--line); }
+  .action .title { font-weight:600; }
+  .action .detail { color:var(--dim); margin:2px 0 4px; }
+  button { font: inherit; padding:5px 10px; border:1px solid #c9ced4; border-radius:6px; background:#fff; cursor:pointer; }
+  button:hover { background:var(--soft); } button:disabled { opacity:.5; cursor:default; }
+  button.go { border-color:#9a6700; color:#9a6700; }
+  .buttons { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+  .buttons div { display:flex; flex-direction:column; gap:3px; }
+  .buttons .cmd { font-size:11px; }
+  pre.log { background:#0b1220; color:#d7dde6; padding:10px 12px; border-radius:6px; max-height:360px; overflow:auto;
+            font-size:12px; white-space:pre-wrap; }
+  .confirm { border:1px solid #9a6700; background:#fff8e6; padding:10px 12px; border-radius:6px; margin:10px 0; }
+  form.settings label { display:grid; grid-template-columns:150px 1fr 200px 90px; gap:10px; align-items:center;
+                        padding:6px 0; border-bottom:1px solid var(--line); }
+  form.settings input[type=text] { font: inherit; padding:4px 6px; border:1px solid #c9ced4; border-radius:4px; width:100%; }
+  form.settings .desc { color:var(--dim); font-size:12px; }
+  .notice { border-left:3px solid #9a6700; padding:6px 10px; background:#fff8e6; margin:10px 0; }
+  h2 { font-size:15px; margin:18px 0 6px; }
+  .small { font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">course</h1>
+  <nav><a href="#status" id="nav-status">Status</a><a href="#settings" id="nav-settings">Settings</a></nav>
+  <span class="meta" id="meta"></span>
+</header>
+<main id="main"><p class="dim">loading…</p></main>
+
+<script>
+"use strict";
+let STATE = null;
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api = async (path, opts) => { const r = await fetch(path, opts); return r.json(); };
+const post = (path, body) => api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body || {})});
+
+async function load() {
+  STATE = await api("/api/state");
+  const c = STATE.course;
+  document.title = c.course;
+  $("#title").textContent = `${c.course} · ${c.title || ""}`;
+  $("#meta").textContent = `${c.org} · ${STATE.students.length} student(s)` +
+    (STATE.participants.length > STATE.students.length ? ` + ${STATE.participants.length - STATE.students.length} test` : "") +
+    ` · ${STATE.assignments.length} assignment(s) · ${STATE.github.available ? "GitHub read " + STATE.generated.slice(11,16) + " UTC" : "GitHub unreachable"}`;
+  route();
+}
+
+function route() {
+  const hash = location.hash || "#status";
+  $("#nav-status").className = hash === "#status" ? "on" : "";
+  $("#nav-settings").className = hash === "#settings" ? "on" : "";
+  if (hash === "#settings") return renderSettings();
+  if (hash.startsWith("#assignment/")) return renderAssignment(hash.slice(12));
+  renderStatus();
+}
+window.addEventListener("hashchange", route);
+
+// ── Status ───────────────────────────────────────────────────────────────
+function renderStatus() {
+  const s = STATE, c = s.course.course;
+  let h = "";
+  if (!s.github.available) h += `<div class="notice">GitHub is not reachable (${esc(s.github.error)}). Template and repository columns are <b>unknown</b>, not empty.</div>`;
+  if (!s.table.length) {
+    h += `<p>No assignments yet. Start with <span class="cmd">${esc(c)} new a00</span> in a terminal.</p>`;
+  } else {
+    h += `<table><tr><th></th><th>kind</th><th>template</th><th>repos</th><th>marks</th><th>complete</th><th>flags</th></tr>`;
+    for (const r of s.table) {
+      h += `<tr class="row" onclick="location.hash='#assignment/${esc(r.id)}'"><td><b>${esc(r.id)}</b></td><td>${esc(r.kind)}</td>` +
+           `<td class="${r.template.startsWith('published') ? 'ok' : 'dim'}">${esc(r.template)}</td>` +
+           `<td>${esc(r.repos)}</td><td>${esc(r.marks)}</td><td>${esc(r.complete)}</td><td class="warn">${esc(r.flags)}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  const acts = s.actions || [];
+  if (!acts.length) h += `<p class="ok"><b>Nothing out of step.</b></p>`;
+  else {
+    h += `<h2>What is out of step</h2>`;
+    for (const a of acts) {
+      h += `<div class="action"><span class="sev ${esc(a.severity)}">${esc(a.severity.toUpperCase())}</span> <span class="title">${esc(a.title)}</span>` +
+           `<div class="detail">${esc(a.detail)}</div>` +
+           (a.command ? `<span class="cmd">${esc(a.command)}</span> ${a.command.startsWith(c + " ") ? runButton(a.command) : '<span class="dim small">(type this in a terminal)</span>'}` : "") + `</div>`;
+    }
+  }
+  h += `<p class="small dim" style="margin-top:16px"><button onclick="refresh()">Refresh</button> The same view in a terminal: <span class="cmd">${esc(c)}</span></p>`;
+  h += logPanel();
+  $("#main").innerHTML = h;
+}
+
+async function refresh() { await post("/api/refresh"); await load(); }
+
+// ── Assignment ───────────────────────────────────────────────────────────
+async function renderAssignment(aid) {
+  const d = await api("/api/assignment/" + encodeURIComponent(aid));
+  if (d.error) { $("#main").innerHTML = `<p class="stop">${esc(d.error)}</p>`; return; }
+  const c = d.course.course, total = d.rows.length;
+  let h = `<p><a href="#status">← Status</a></p><h2>${esc(aid)} · ${esc(d.title)} <span class="dim">(${esc(d.kind)})</span></h2>`;
+  if (d.problems.length) h += `<div class="notice stop">${esc(d.problems[0])}</div>`;
+  if (d.drift.length) h += `<div class="notice stop">Restore copies disagree: ${esc(d.drift.map(x => x.file + " (" + x.problem + ")").join(", "))}. Run verify.</div>`;
+  const cmds = [`${c} verify ${aid}`, `${c} template ${aid} --go`, `${c} assign ${aid} --go`, `${c} patch ${aid} --go`];
+  if (d.kind === "auto") cmds.push(`${c} marks ${aid}`); else cmds.push(`${c} collect ${aid}`);
+  cmds.push(`${c} sheet ${aid}`);
+  h += `<div class="buttons">` + cmds.map(cmd => `<div>${runButton(cmd, true)}<span class="cmd">${esc(cmd)}</span></div>`).join("") + `</div>`;
+  h += `<p class="small dim">Template: ${d.template_exists === null ? "unknown" : d.template_exists ? `<a href="${esc(d.template_url)}">published</a>` + (d.is_template ? "" : " (flag not set)") : "not published"}` +
+       ` · repos ${d.repos === null ? "?" : d.repos}/${total}` + (d.graded ? ` · graded ${d.graded_at.slice(0,16).replace("T"," ")} UTC` : d.collected ? " · collected" : "") +
+       ` · output: <code>${esc(d.grading_dir)}</code></p>`;
+  h += `<table><tr><th>name</th><th>github</th><th>repository</th><th>last push</th><th>tick</th><th>score</th><th>complete</th><th>changed</th>` +
+       (d.sheet.length ? `<th>mark</th>` : "") + `</tr>`;
+  const marks = {};
+  for (const r of d.sheet) marks[r.username] = r;
+  for (const r of d.rows) {
+    const repo = r.has_repo === null ? "?" : r.has_repo ? `<a href="${esc(r.url)}">${esc(r.repo)}</a>` : `<span class="dim">none (${esc(r.membership)})</span>`;
+    const score = r.score !== "" && r.score != null ? `${esc(r.score)}/${esc(r.max)}` + (r.stale ? ` <span class="warn">stale</span>` : "") : "";
+    h += `<tr><td>${esc(r.name)}${r.role === "test" ? ' <span class="dim">(test)</span>' : ""}</td><td>${esc(r.github_id)}</td><td>${repo}</td>` +
+         `<td class="small">${esc((r.pushed_at || "").slice(0,16).replace("T"," "))}</td><td class="small ${r.tick === "success" ? "ok" : r.tick === "failure" ? "stop" : "dim"}">${r.tick_url ? `<a href="${esc(r.tick_url)}">${esc(r.tick)}</a>` : esc(r.tick || "")}</td>` +
+         `<td>${score}</td><td class="${r.complete === "yes" ? "ok" : r.complete === "no" ? "warn" : "dim"}">${esc(r.complete)}</td><td class="small">${esc(r.changed)}</td>` +
+         (d.sheet.length ? `<td>${esc((marks[r.username] || {}).mark || "")}</td>` : "") + `</tr>`;
+  }
+  h += `</table>`;
+  if (d.sheet.length) h += `<p class="small dim">Marks shown from ${esc(d.sheet_name)}. Type into it in a spreadsheet; this page only reads it.</p>`;
+  h += `<p class="small dim">The tick is on each commit in GitHub; it is a convenience, not the grade. <code>marks</code> and <code>sheet</code> are.</p>`;
+  h += logPanel();
+  $("#main").innerHTML = h;
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────
+function renderSettings() {
+  const s = STATE, c = s.course;
+  let h = `<h2>Settings</h2><p class="small dim">${esc(s.paths.config)} · every field is <span class="cmd">${esc(c.course)} config &lt;setting&gt; &lt;value&gt;</span></p>`;
+  h += `<div class="notice small">Changing <b>runner</b>, <b>image</b>, <b>build</b> or <b>tick_on_manual</b> only reaches templates published from then on. ` +
+       `Repositories that already exist keep the old workflow until you run <span class="cmd">${esc(c.course)} patch &lt;assignment&gt; --files .github/workflows/autograde.yml --go</span>.</div>`;
+  h += `<form class="settings" onsubmit="return false">`;
+  for (const key of Object.keys(s.descriptions)) {
+    const val = c[key] == null ? "" : String(c[key]);
+    const locked = key === "course";
+    h += `<label><b>${esc(key)}</b><input type="text" id="set-${esc(key)}" value="${esc(val)}" ${locked ? "disabled" : ""}>` +
+         `<span class="desc">${esc(s.descriptions[key])}</span>` +
+         (locked ? `<span class="dim small">fixed</span>` : `<button onclick="saveSetting('${esc(key)}')">Save</button>`) + `</label>`;
+  }
+  h += `</form>`;
+  const chk = `${c.course} config --check`;
+  h += `<div class="buttons"><div>${runButton(chk, true)}<span class="cmd">${esc(chk)}</span></div>` +
+       `<div>${runButton(c.course + " doctor", true)}<span class="cmd">${esc(c.course)} doctor</span></div></div>`;
+  h += logPanel();
+  $("#main").innerHTML = h;
+}
+
+function saveSetting(key) {
+  const v = $("#set-" + key).value.trim();
+  const cmd = `${STATE.course.course} config ${key} ${JSON.stringify(v)}`;
+  runCommand(cmd, true);
+}
+
+// ── running a command (the only write path) ──────────────────────────────
+function runButton(cmd, labelVerb) {
+  const go = cmd.includes("--go");
+  const label = labelVerb ? cmd.split(" ")[1] + (go ? " --go" : "") : "run";
+  return `<button class="${go ? "go" : ""}" onclick='runCommand(${JSON.stringify(cmd)})'>${esc(label)}</button>`;
+}
+
+function logPanel() {
+  return `<div id="confirm"></div><h2 id="log-title" class="dim small" style="display:none">output</h2><pre class="log" id="log" style="display:none"></pre>`;
+}
+
+async function runCommand(cmd, confirmed) {
+  // Preview by default: a --go command is first run WITHOUT --go, shown, and
+  // only sent with --go after a second click.
+  if (cmd.includes("--go") && !confirmed) {
+    await runCommand(cmd.replace(" --go", ""), true);
+    $("#confirm").innerHTML = `<div class="confirm">That was the preview. Nothing changed. To do it:<br><span class="cmd">${esc(cmd)}</span> ` +
+      `<button class="go" onclick='runCommand(${JSON.stringify(cmd)}, true)'>Yes, run with --go</button></div>`;
+    return;
+  }
+  $("#confirm").innerHTML = "";
+  const res = await post("/api/run", {command: cmd, confirm: !!confirmed});
+  const logEl = $("#log"); $("#log-title").style.display = ""; logEl.style.display = "";
+  if (res.error) { logEl.textContent = "refused: " + res.error; return; }
+  logEl.textContent = res.lines.join("\n");
+  let since = res.total;
+  const poll = async () => {
+    const j = await api(`/api/job/${res.id}/${since}`);
+    if (j.lines && j.lines.length) { logEl.textContent += "\n" + j.lines.join("\n"); logEl.scrollTop = logEl.scrollHeight; since = j.total; }
+    if (!j.done) setTimeout(poll, 700);
+    else if (cmd.includes("--go") || cmd.includes(" config ") || cmd.includes(" marks ") || cmd.includes(" collect ")) { STATE = await api("/api/state"); }
+  };
+  poll();
+}
+
+load();
+</script>
+</body>
+</html>

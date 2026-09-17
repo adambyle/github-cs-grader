@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""
+install, set up one course and one command, in one pass.
+========================================================
+
+    ./install                      interactive
+    ./install --update             re-run on a configured machine; offers to change answers
+    ./install --non-interactive --course cs108 --org 26fa-cs108 --runner runners-26fa-cs108 ...
+
+Asks for the course code (which becomes the command name), title,
+organization, course folder, runner scale set, container image, build
+command, whether hand-graded assignments get a check on push, and the
+grading folder. Validates every answer before writing. Checks gh, org
+access, git, python3 and node, and names the fix when one is missing.
+
+WHAT IT CREATES
+    <course folder>/course.json            every setting
+    <course folder>/README.md              the folder layout, explained
+    <course folder>/CHEATSHEET.md + .pdf   one page, with the real command name
+    <course folder>/roster/roster.csv      header only, until `students import`
+    <course folder>/assignments/, autograders/, templates/
+    ~/.local/bin/<course>                  the command (or a shell alias, if chosen)
+    ~/.config/coursekit/courses.json       where the course lives, so the command works anywhere
+
+IDEMPOTENT
+    Run it again and it offers to update the existing answers rather than
+    clobbering them, and never destroys a course folder with content in it.
+    It refuses to create a command that already exists on PATH unless that
+    command is a shim it wrote itself.
+
+    User-level only. No sudo.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from coursekit import checks, cheatsheet, config as cfg, scaffold  # noqa: E402
+from coursekit.out import bold, dim, green, red, yellow  # noqa: E402
+
+SHIM_MARK = "# coursekit shim"
+
+
+def ask(question: str, default: str = "", validate=None, interactive: bool = True) -> str:
+    """One prompt with a default in brackets; re-asks until validate() passes."""
+    while True:
+        if interactive:
+            shown = f" [{default}]" if default else ""
+            try:
+                answer = input(f"  {question}{shown}: ").strip()
+            except EOFError:
+                answer = ""
+            if not answer:
+                answer = default
+        else:
+            answer = default
+            print(f"  {question.strip():<52} {answer}")
+        if validate:
+            why = validate(answer)
+            if why:
+                print(f"    {red(why)}")
+                if not interactive:
+                    sys.exit(1)
+                continue
+        return answer
+
+
+def yes_no(question: str, default: bool, interactive: bool) -> bool:
+    if not interactive:
+        return default
+    answer = ask(question + (" [yes]" if default else " [no]"), "", interactive=True)
+    if not answer:
+        return default
+    return answer.lower() in ("y", "yes", "true", "1")
+
+
+def write_shim(path: Path, course: str, python: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "#!/bin/sh\n"
+        f"{SHIM_MARK} for course {course}. Installed by {HERE / 'install'}.\n"
+        f"# Runs the toolkit at {HERE} with this course's command name.\n"
+        f"COURSEKIT_COMMAND=\"{course}\" exec \"{python}\" \"{HERE / 'coursekit' / '__main__.py'}\" \"$@\"\n",
+        encoding="utf-8")
+    path.chmod(0o755)
+
+
+def alias_line(course: str, python: str) -> str:
+    return (f"alias {course}='COURSEKIT_COMMAND={course} \"{python}\" "
+            f"\"{HERE / 'coursekit' / '__main__.py'}\"'  {SHIM_MARK}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Set up one course and one command.")
+    ap.add_argument("--non-interactive", action="store_true", help="take the flags and defaults, ask nothing")
+    ap.add_argument("--update", action="store_true", help="update an existing course folder's answers")
+    ap.add_argument("--course"), ap.add_argument("--title"), ap.add_argument("--org")
+    ap.add_argument("--folder"), ap.add_argument("--runner"), ap.add_argument("--image")
+    ap.add_argument("--build"), ap.add_argument("--grading")
+    ap.add_argument("--tick-on-manual", choices=["yes", "no"])
+    ap.add_argument("--shim", choices=["bin", "alias", "none"], default=None,
+                    help="how to install the command: ~/.local/bin (default), a shell alias, or not at all")
+    ap.add_argument("--bin-dir", default=str(Path.home() / ".local" / "bin"))
+    ap.add_argument("--skip-checks", action="store_true", help="do not run the precondition checks")
+    args = ap.parse_args()
+    inter = not args.non_interactive and sys.stdin.isatty()
+
+    print(f"\n{bold('coursekit install')}  {dim(str(HERE))}\n")
+
+    # ── existing answers, if any ───────────────────────────────────────
+    existing = {}
+    folder_guess = args.folder
+    if not folder_guess:
+        root = cfg.walk_up()
+        if root and (root / cfg.CONFIG_NAME).is_file():
+            folder_guess = str(root)
+    if folder_guess and (Path(folder_guess).expanduser() / cfg.CONFIG_NAME).is_file():
+        try:
+            existing = json.loads((Path(folder_guess).expanduser() / cfg.CONFIG_NAME).read_text())
+            print(f"  Found an existing course.json in {folder_guess}; its values are the defaults below.")
+            print(f"  Nothing in that folder will be deleted.\n")
+        except json.JSONDecodeError:
+            existing = {}
+
+    def d(key, fallback=""):
+        return str(getattr(args, key.replace("-", "_"), None) or existing.get(key) or fallback)
+
+    # ── questions ──────────────────────────────────────────────────────
+    code = ask("Course code            (becomes your command name) ", d("course"),
+               validate=cfg.validate_course_code, interactive=inter and not existing.get("course"))
+    if existing.get("course") and existing["course"] != code:
+        print(red("  The course code of an existing course cannot be changed; it is the command name"))
+        print(red("  and part of every repository name. Use a new folder for a new course."))
+        return 1
+    title = ask("Course title           (for headings and help text)", d("title", code.upper()), interactive=inter)
+    org = ask("GitHub organization                                ", d("org"),
+              validate=lambda v: cfg.validate_value("org", v), interactive=inter)
+    default_folder = d("folder") or folder_guess or str(Path.home() / "Courses" / code.upper())
+    folder = Path(ask("Course folder          ", default_folder, interactive=inter)).expanduser().resolve()
+    print()
+    runner = ask("Runner scale set name  (the ARC scale set for this org; see docs/runners.md)",
+                 d("runner"), validate=lambda v: cfg.validate_value("runner", v), interactive=inter)
+    image = ask("Container image        ", d("image", "node:22"),
+                validate=lambda v: cfg.validate_value("image", v), interactive=inter)
+    build = ask("Build command          ", d("build", "npm test"),
+                validate=lambda v: cfg.validate_value("build", v), interactive=inter)
+    print()
+    print("  Some assignments you will grade by reading them, with no automatic tests at")
+    print("  all. GitHub can still run a check every time a student pushes one of those.")
+    print("  With no tests to run, the check can only confirm that the code loads without")
+    print("  crashing. If it cannot, the student sees a red X on work that may be perfectly")
+    print("  good, and comes to ask you why.\n")
+    tick_default = (args.tick_on_manual == "yes") if args.tick_on_manual else bool(existing.get("tick_on_manual", False))
+    tick = yes_no("Run a check on hand-graded assignments?", tick_default, inter)
+    print()
+    grading = ask("Grading output folder  ", d("grading", f"~/{code}-grading"), interactive=inter)
+    print()
+
+    # ── checks ─────────────────────────────────────────────────────────
+    if not args.skip_checks:
+        print("  Checking:")
+        results = checks.preconditions(org)
+        ok = checks.print_results(results)
+        print()
+        if not ok:
+            print(red("  Fix the failed check(s) above and run ./install again."))
+            print(dim("  (or pass --skip-checks to write the configuration anyway)"))
+            return 1
+
+    # ── the command ────────────────────────────────────────────────────
+    python = sys.executable
+    shim_mode = args.shim
+    bin_dir = Path(args.bin_dir).expanduser()
+    shim_path = bin_dir / code
+    found = shutil.which(code)
+    ours = found and SHIM_MARK in Path(found).read_text(errors="replace")
+    if found and not ours and shim_mode != "none":
+        print(red(f"  A command named {code!r} already exists on PATH: {found}"))
+        print(red("  Refusing to shadow it. Pick a different course code, or remove that command."))
+        return 1
+    if shim_mode is None:
+        if inter and not ours:
+            print("  The command can be a small script in ~/.local/bin (recommended) or a shell")
+            print("  alias appended to your profile.")
+            choice = ask("Install as [bin/alias]", "bin", interactive=True)
+            shim_mode = "alias" if choice.startswith("a") else "bin"
+        else:
+            shim_mode = "bin"
+
+    # ── the course folder ──────────────────────────────────────────────
+    if folder.exists() and any(folder.iterdir()) and not (folder / cfg.CONFIG_NAME).is_file():
+        print(yellow(f"  {folder} exists and has content but no course.json."))
+        if not yes_no("Use it anyway (nothing will be deleted)?", False, inter):
+            return 1
+    folder.mkdir(parents=True, exist_ok=True)
+    for sub in ("roster", "assignments", "autograders", "templates"):
+        (folder / sub).mkdir(exist_ok=True)
+
+    data = dict(existing)
+    data.update({"course": code, "title": title, "org": org, "runner": runner, "image": image,
+                 "build": build, "tick_on_manual": tick, "grading": grading})
+    data.setdefault("grader_default", "js")
+    changed = {k: v for k, v in data.items() if existing.get(k) != v}
+    (folder / cfg.CONFIG_NAME).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    for k, v in changed.items():
+        cfg.append_history(folder, f"install {k}: {existing.get(k)!r} -> {v!r}")
+    print(f"  {'Updated' if existing else 'Created'}  {folder / cfg.CONFIG_NAME}")
+
+    course = cfg.Course(folder, data)
+    for name in ("autograde.yml", "check.yml"):
+        dest = folder / "templates" / name
+        src = scaffold.TEMPLATES / name
+        if not dest.is_file():
+            shutil.copyfile(src, dest)
+            print(f"  Created  {dest}")
+        elif dest.read_bytes() != src.read_bytes():
+            print(dim(f"  Kept     {dest} (differs from the toolkit's copy; yours wins)"))
+    roster = folder / "roster" / "roster.csv"
+    if not roster.is_file():
+        roster.write_text("username,first_name,last_name,email,section,github_id,role\n", encoding="utf-8")
+        (folder / "roster" / "README.md").write_text(
+            "# roster.csv\n\n"
+            "One row per person. `username` is the institution's identifier and forms the\n"
+            "repository name; `github_id` is the GitHub login (blank until the student\n"
+            "supplies it; `students import` fills it from a form export). `role` is\n"
+            "student, test, teacher or staff. Keep ONE row with role=test for a GitHub\n"
+            "account you control: every assignment goes to it before students see it.\n\n"
+            "This file holds names and email addresses. Keep the course folder private.\n",
+            encoding="utf-8")
+        print(f"  Created  {roster}")
+    readme = folder / "README.md"
+    if not readme.is_file():
+        scaffold.write(readme, "COURSE_README.md", course=code, course_title=title, folder_name=folder.name)
+        print(f"  Created  {readme}")
+    gi = folder / ".gitignore"
+    if not gi.is_file():
+        scaffold.write(gi, "gitignore")
+    md, pdf = cheatsheet.write(course)
+    print(f"  Wrote    {md}\n  Wrote    {pdf}")
+    cfg.remember_course(code, folder)
+
+    # ── the shim ───────────────────────────────────────────────────────
+    if shim_mode == "bin":
+        write_shim(shim_path, code, python)
+        print(f"  {'Updated' if ours else 'Created'}  {shim_path}")
+        on_path = str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
+        if not on_path:
+            print(yellow(f"\n  {bin_dir} is not on your PATH. Add this to your shell profile"))
+            print(yellow("  (~/.zshrc on macOS, ~/.bashrc on Linux) if it is not already there:"))
+            print(bold(f'      export PATH="{bin_dir}:$PATH"'))
+            print(dim("  then open a new terminal."))
+    elif shim_mode == "alias":
+        shell = os.environ.get("SHELL", "")
+        profile = Path.home() / (".zshrc" if shell.endswith("zsh") else ".bashrc")
+        line = alias_line(code, python)
+        text = profile.read_text(encoding="utf-8") if profile.is_file() else ""
+        lines = [l for l in text.splitlines() if not (SHIM_MARK in l and f"alias {code}=" in l)]
+        lines.append(line)
+        profile.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"  Added    alias {code} to {profile}  (open a new terminal, or: source {profile})")
+
+    print(f"\n  Then:  {bold(code)}")
+    print(f"         {bold(code + ' new a00')}      to scaffold the first assignment")
+    print(f"         {bold(code + ' doctor')}       whenever something feels wrong\n")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\ninterrupted; nothing else was written")
+        sys.exit(130)
