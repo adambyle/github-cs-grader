@@ -156,15 +156,15 @@ capability, add the verb first and surface it second.
 
 ## Documentation
 
-| Page | Read it when |
-|---|---|
-| `docs/writing-an-assignment.md` | writing your first assignment, or your tenth |
-| `docs/score-vs-complete.md` | someone asks why a low score is marked complete |
-| `docs/troubleshooting.md` | something is wrong and you do not know which layer |
-| `docs/runners.md` | before the first assignment goes out, and when the tick stops |
-| `docs/course-tooling-brief.md` | the build brief this toolkit was made from |
-| `course-tooling-spec.md` (in the Vic-System Claude project) | the full specification, with the reasons and the scars; copy it into `docs/` to keep it with the code |
-| `CHEATSHEET.md` in your course folder | standing at a terminal with a class waiting |
+| Page                                                          | Read it when                                                                                           |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `docs/writing-an-assignment.md`                             | writing your first assignment, or your tenth                                                           |
+| `docs/score-vs-complete.md`                                 | someone asks why a low score is marked complete                                                        |
+| `docs/troubleshooting.md`                                   | something is wrong and you do not know which layer                                                     |
+| `docs/runners.md`                                           | before the first assignment goes out, and when the tick stops                                          |
+| `docs/course-tooling-brief.md`                              | the build brief this toolkit was made from                                                             |
+| `course-tooling-spec.md` (in the Vic-System Claude project) | the full specification, with the reasons and the scars; copy it into`docs/` to keep it with the code |
+| `CHEATSHEET.md` in your course folder                       | standing at a terminal with a class waiting                                                            |
 
 ## Tests
 
