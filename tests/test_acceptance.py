@@ -470,6 +470,34 @@ class T06Patch(unittest.TestCase):
         self.assertIn("0 file write(s)", text)
         self.assertEqual(commits, ENV.repo_commits(f"{COURSE}-a01-ada"))
 
+    def test_03b_patch_creates_files_added_to_restore_after_assign(self):
+        """A provided file that did not exist when the repos went out (a new
+        helper, a new fixtures folder) is created in every repository once it
+        is on the restore list and in the bundle."""
+        for d in ("assignments/a01/starter", "assignments/a01/answers", "autograders/a01"):
+            (ENV.course_dir / d / "helper.js").write_text("module.exports = {};\n")
+            (ENV.course_dir / d / "fixtures").mkdir(exist_ok=True)
+            (ENV.course_dir / d / "fixtures" / "data.txt").write_text("1,2,3\n")
+        aj = ENV.course_dir / "assignments/a01/assignment.json"
+        data = json.loads(aj.read_text())
+        data["restore"] += ["helper.js", "fixtures/"]
+        aj.write_text(json.dumps(data))
+        ENV.run("verify", "a01", "--quick")
+        text = ENV.run("patch", "a01")
+        self.assertIn("helper.js: would create", text)
+        self.assertIn("fixtures/data.txt: would create", text)
+        self.assertNotIn("helper.js", ENV.repo_files(f"{COURSE}-a01-ada"))
+        text = ENV.run("patch", "a01", "--go")
+        self.assertIn("0 deliverables changed", text)
+        for repo in (f"{COURSE}-a01-ada", f"{COURSE}-a01-starter"):
+            files = ENV.repo_files(repo)
+            self.assertIn("helper.js", files)
+            self.assertIn("fixtures/data.txt", files)
+        # a second run adds nothing
+        commits = ENV.repo_commits(f"{COURSE}-a01-ada")
+        ENV.run("patch", "a01", "--go")
+        self.assertEqual(commits, ENV.repo_commits(f"{COURSE}-a01-ada"))
+
     def test_04_patch_works_for_manual_assignments_from_the_starter(self):
         readme = ENV.course_dir / "assignments" / "a09" / "starter" / "README.md"
         readme.open("a").write("\nClarified.\n")
