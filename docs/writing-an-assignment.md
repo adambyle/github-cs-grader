@@ -43,6 +43,12 @@ effect of committing.
   means every file under that folder.
 - `ignore` (optional) lists starter files that must never be published.
 
+For a project-shaped assignment (an Expo or Vite scaffold, say), most files
+are scaffolding the student never touches: configs, assets, a lock file.
+List those in `restore` too, with folders as `"assets/"`. Only the files the
+student writes stay off it. Two things depend on this: `patch` can only
+push what is on the list, and `verify` stops treating scaffolding as work.
+
 ## The restore list is the safety model
 
 One list, three jobs:

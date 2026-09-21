@@ -128,12 +128,23 @@ def verify(course: cfg.Course, aid: str, quick: bool = False) -> dict:
             problems.append("starter/ and answers/ are identical; the solution has leaked "
                             "into the starter, or the starter is already solved")
         else:
-            for f in a.deliverables():
-                s, ans = a.starter / f, a.answers / f
-                if ans.is_file() and s.read_bytes() == ans.read_bytes():
-                    problems.append(f"{f} is identical in starter/ and answers/, and it is a "
-                                    f"deliverable: either the solution leaked into the starter "
-                                    f"or the file belongs on the restore list")
+            # Deliverables that are byte-identical in starter/ and answers/.
+            # For an autograded assignment that is a leak (or a provided file
+            # missing from restore) and is reported as a problem. For a manual
+            # assignment it is usually scaffolding (assets, configs, a lock
+            # file) that simply has not been listed in restore yet, so it is
+            # ONE note naming them, not one problem per file. A Vic-sized
+            # Expo project produced twenty-one of those on 2026-09-21.
+            same = [f for f in a.deliverables()
+                    if (a.answers / f).is_file()
+                    and (a.starter / f).read_bytes() == (a.answers / f).read_bytes()]
+            if same:
+                shown = ", ".join(same[:6]) + (f" (+{len(same) - 6} more)" if len(same) > 6 else "")
+                text = (f"{len(same)} deliverable(s) identical in starter/ and answers/: {shown}. "
+                        f"Either the solution leaked into the starter, or these are provided "
+                        f"files and belong on the restore list in {asg.ASSIGNMENT_JSON} "
+                        f"(which is also what lets patch push them)")
+                (problems if a.is_auto else notes).append(text)
     deliverables = a.deliverables()
     report["deliverables"] = deliverables
     if a.is_auto and not deliverables:

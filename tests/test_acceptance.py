@@ -249,7 +249,7 @@ class T02Assignments(unittest.TestCase):
             "full-marks": (lambda d, b: shutil.copy(d / "answers" / "app.js", d / "starter" / "app.js"),
                            "starter scores 4/4"),
             "leak": (lambda d, b: shutil.copy(d / "answers" / "app.js", d / "starter" / "app.js"),
-                     "app.js is identical in starter/ and answers/"),
+                     "identical in starter/ and answers/: app.js"),
             "deliverable-in-bundle": (lambda d, b: shutil.copy(d / "starter" / "app.js", b / "app.js"),
                                       "app.js is a deliverable and is IN the bundle"),
             "denominator": (lambda d, b: (b / "autograder.js").write_text(
