@@ -152,7 +152,7 @@ def verify(course: cfg.Course, aid: str, quick: bool = False) -> dict:
                         "for the student to write")
 
     # ── SYNC ──────────────────────────────────────────────────────────
-    restore_names = a.restore_files(a.source_dir())
+    restore_names = a.restore_names()
     for name in restore_names:
         copies = {"starter": a.starter / name, "answers": a.answers / name}
         if a.is_auto:

@@ -74,7 +74,10 @@ def run(course: cfg.Course, argv) -> int:
 
     workflow_path = asg.WORKFLOW_PATH if a.is_auto else ".github/workflows/check.yml"
     source_dir = a.source_dir()
-    restore_names = a.restore_files(source_dir)
+    # Expanded over starter, answers and bundle together, so a file that
+    # exists in one copy and not the source is reported below as missing
+    # rather than silently skipped.
+    restore_names = a.restore_names()
     protected = list(restore_names) + ([workflow_path] if a.ships_workflow() else [])
 
     if args.files:
@@ -95,6 +98,9 @@ def run(course: cfg.Course, argv) -> int:
 
     if not names:
         out.say(f"Nothing to patch: {a.id} has an empty restore list and ships no workflow.")
+        out.say(f"  The list is \"restore\" in {a.dir / asg.ASSIGNMENT_JSON}")
+        out.say(f"  Name the provided files there (folders as \"assets/\"), run "
+                f"{course.course} verify {a.id}, then patch again.")
         return 0
 
     def source_bytes(name: str) -> bytes:
@@ -111,7 +117,8 @@ def run(course: cfg.Course, argv) -> int:
             missing.append(str(source_dir / n))
     if missing:
         out.say("error: not found: " + ", ".join(missing))
-        out.say(f"  Fix the file in {source_dir} first; that is what grading uses.")
+        out.say(f"  patch pushes the copy in {source_dir}; that is what grading uses.")
+        out.say(f"  Put the file there (byte-identical to the starter's), then:  {course.course} verify {a.id}")
         return 1
 
     payload = {n: source_bytes(n) for n in names}

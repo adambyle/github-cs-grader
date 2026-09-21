@@ -217,8 +217,7 @@ def run(course: cfg.Course, argv) -> int:
             continue
         for p in a.problems():
             contract_total.append(f"{aid}: {p}")
-        src = a.source_dir()
-        for name in a.restore_files(src):
+        for name in a.restore_names():
             copies = [a.starter / name, a.answers / name] + ([a.bundle / name] if a.is_auto else [])
             blobs = {c.read_bytes() for c in copies if c.is_file()}
             missing = [str(c.parent.name) for c in copies if not c.is_file()]

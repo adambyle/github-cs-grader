@@ -109,8 +109,7 @@ def snapshot(course: cfg.Course, gh: Optional[ghcli.Gh] = None) -> dict:
 
         drift = []
         if a and a.starter.is_dir():
-            src = a.source_dir()
-            for name in a.restore_files(src):
+            for name in a.restore_names():
                 copies = {"starter": a.starter / name, "answers": a.answers / name}
                 if a.is_auto:
                     copies["bundle"] = a.bundle / name

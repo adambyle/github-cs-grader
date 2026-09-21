@@ -157,6 +157,25 @@ class Assignment:
                 out.append(entry)
         return out
 
+    def restore_names(self) -> List[str]:
+        """The restore list expanded against EVERY copy: starter, answers and
+        (autograded) the bundle, unioned and sorted.
+
+        Expanding against one folder only is a silent trap: a file added
+        under starter/fixtures/ but never copied into the bundle's fixtures/
+        would be invisible to verify (nothing to compare) and to patch
+        (nothing to push). Expanding against all three makes the missing
+        copy show up by name in SYNC, and makes patch refuse until it is
+        fixed, which is the behaviour a provided file must have.
+        """
+        places = [self.starter, self.answers] + ([self.bundle] if self.is_auto else [])
+        names: List[str] = []
+        for base in places:
+            for name in self.restore_files(base):
+                if name not in names:
+                    names.append(name)
+        return sorted(names)
+
     def is_restored(self, rel: str) -> bool:
         """Is this relative path covered by the restore list?"""
         for entry in self.restore:

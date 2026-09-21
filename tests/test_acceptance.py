@@ -446,7 +446,7 @@ class T06Patch(unittest.TestCase):
     def test_01_patch_refuses_a_deliverable_and_prints_restore(self):
         text = ENV.run("patch", "a01", "--files", "app.js", expect=1)
         self.assertIn("refusing to push", text)
-        self.assertIn("test.js, package.json", text)
+        self.assertIn("package.json, test.js", text)
 
     def test_02_patch_preview_changes_nothing(self):
         (ENV.course_dir / "autograders" / "a01" / "test.js").open("a").write("// fixed a hint\n")
@@ -497,6 +497,18 @@ class T06Patch(unittest.TestCase):
         commits = ENV.repo_commits(f"{COURSE}-a01-ada")
         ENV.run("patch", "a01", "--go")
         self.assertEqual(commits, ENV.repo_commits(f"{COURSE}-a01-ada"))
+
+    def test_03c_a_file_added_only_to_the_starter_is_named_not_skipped(self):
+        """A folder entry on restore is expanded over every copy, so a file
+        dropped into starter/fixtures/ without a bundle copy is reported by
+        verify and refused by patch, never silently left out."""
+        (ENV.course_dir / "assignments/a01/starter/fixtures/extra.txt").write_text("x\n")
+        text = ENV.run("verify", "a01", "--quick", expect=1)
+        self.assertIn("fixtures/extra.txt, which is not in the bundle", text)
+        text = ENV.run("patch", "a01", expect=1)
+        self.assertIn("not found", text)
+        self.assertIn("fixtures/extra.txt", text)
+        (ENV.course_dir / "assignments/a01/starter/fixtures/extra.txt").unlink()
 
     def test_04_patch_works_for_manual_assignments_from_the_starter(self):
         readme = ENV.course_dir / "assignments" / "a09" / "starter" / "README.md"
