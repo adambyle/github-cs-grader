@@ -510,6 +510,31 @@ class T06Patch(unittest.TestCase):
         self.assertIn("fixtures/extra.txt", text)
         (ENV.course_dir / "assignments/a01/starter/fixtures/extra.txt").unlink()
 
+    def test_03d_patch_missing_adds_new_starter_files_and_never_overwrites(self):
+        """--missing pushes starter files a repository lacks, with an empty
+        restore list, and leaves every existing file alone, including a
+        deliverable the student has edited."""
+        # a09 is manual with an empty restore list; ada's repo is untouched
+        # starter, tester's has an edited app.js (from test_04 in T05).
+        (ENV.course_dir / "assignments/a09/starter/extra.md").write_text("new guidance\n")
+        (ENV.course_dir / "assignments/a09/answers/extra.md").write_text("new guidance\n")
+        tester_app = ENV.repo_file(f"{COURSE}-a09-tester", "app.js")
+        text = ENV.run("patch", "a09", "--missing")
+        self.assertIn("extra.md: would create", text)
+        self.assertNotIn("app.js: would", text)
+        self.assertNotIn("extra.md", ENV.repo_files(f"{COURSE}-a09-tester"))
+        text = ENV.run("patch", "a09", "--missing", "--go")
+        self.assertIn("0 deliverables changed", text)
+        self.assertIn("extra.md", ENV.repo_files(f"{COURSE}-a09-tester"))
+        self.assertIn("extra.md", ENV.repo_files(f"{COURSE}-a09-ada"))
+        self.assertEqual(tester_app, ENV.repo_file(f"{COURSE}-a09-tester", "app.js"))
+        commits = ENV.repo_commits(f"{COURSE}-a09-tester")
+        text = ENV.run("patch", "a09", "--missing", "--go")
+        self.assertIn("nothing missing", text)
+        self.assertEqual(commits, ENV.repo_commits(f"{COURSE}-a09-tester"))
+        text = ENV.run("patch", "a09", "--missing", "--files", "x", expect=2)
+        self.assertIn("do not combine", text)
+
     def test_04_patch_works_for_manual_assignments_from_the_starter(self):
         readme = ENV.course_dir / "assignments" / "a09" / "starter" / "README.md"
         readme.open("a").write("\nClarified.\n")

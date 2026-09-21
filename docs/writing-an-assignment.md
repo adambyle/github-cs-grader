@@ -225,3 +225,15 @@ In this order:
 
 If the bug is in a file students write, do steps 1 to 3 only and announce
 the change. `patch` will refuse the file. Let it.
+
+## After adding a file the repositories do not have yet
+
+```bash
+cs108 patch a04 --missing        # preview: which repos lack which starter files
+cs108 patch a04 --missing --go
+```
+
+It creates every starter file a repository does not have and leaves every
+existing file alone, whatever its content. Because it only ever creates, it
+cannot destroy student work, and it needs no restore list. It does not
+update anything: a changed provided file still goes through `restore`.

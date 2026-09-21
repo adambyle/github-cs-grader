@@ -7,8 +7,20 @@ patch, push a corrected do-not-edit file into every existing repository.
     cs108 patch a04 --go --files test.js
     cs108 patch a04 --go --files .github/workflows/autograde.yml   # after a config change
     cs108 patch a04 --go --students jsmith
+    cs108 patch a04 --missing             # add starter files the repos do not have yet
+    cs108 patch a04 --missing --go
 
 For when you find a bug in a test after the repositories have gone out.
+
+--missing IS FOR A FILE ADDED AFTER THE REPOSITORIES WENT OUT
+    It pushes every publishable file in starter/ that a repository does NOT
+    already have, and leaves every file that exists alone, whatever its
+    content. Because it only ever creates, it cannot destroy student work,
+    so it needs no restore list; a manual assignment with an empty list can
+    use it freely. It does not update anything: a changed provided file
+    still goes through the restore list. There is deliberately no flag that
+    overwrites every starter file; that would push the starter's copy of a
+    deliverable over a student's work.
 
 WHAT IT PUSHES, AND WHY THAT LIST
     By default, exactly the files on the assignment's restore list (from
@@ -64,7 +76,12 @@ def run(course: cfg.Course, argv) -> int:
     ap.add_argument("--skip-template", action="store_true", help="leave the template repository alone")
     ap.add_argument("--i-know-what-im-doing", dest="override", action="store_true",
                     help="allow --files to name a file outside the restore list, once")
+    ap.add_argument("--missing", action="store_true",
+                    help="create every starter file a repository does not have yet; never overwrites")
     args = ap.parse_args(argv)
+    if args.missing and args.files:
+        out.say("error: --missing and --files do not combine; --missing decides the files itself")
+        return 2
 
     try:
         a = asg.load(course, args.assignment)
@@ -80,7 +97,13 @@ def run(course: cfg.Course, argv) -> int:
     restore_names = a.restore_names()
     protected = list(restore_names) + ([workflow_path] if a.ships_workflow() else [])
 
-    if args.files:
+    if args.missing:
+        # Every file a student received, from the folder they received it
+        # from. The workflow is not included: it is not a starter file, and
+        # it has its own path (--files .github/workflows/...).
+        source_dir = a.starter
+        names = a.starter_files()
+    elif args.files:
         names = [f.strip() for f in args.files.split(",") if f.strip()]
         outside = [n for n in names if n not in protected and not a.is_restored(n)]
         if outside and not args.override:
@@ -147,7 +170,11 @@ def run(course: cfg.Course, argv) -> int:
     for _, student in indexed:
         targets.append((student["username"], course.full(course.student_repo(a.id, student["username"]))))
 
-    out.say(f"{'PREVIEW: ' if not args.go else ''}Patching {', '.join(names)} for {a.id}")
+    if args.missing:
+        out.say(f"{'PREVIEW: ' if not args.go else ''}Adding missing starter files for {a.id} "
+                f"({len(names)} candidate(s); files that already exist are left alone)")
+    else:
+        out.say(f"{'PREVIEW: ' if not args.go else ''}Patching {', '.join(names)} for {a.id}")
     out.say(f"  source  : {source_dir}" + (f" (workflow from {a.workflow_template()})" if workflow_path in names else ""))
     out.say(f"  targets : {len(targets)}\n")
 
@@ -158,9 +185,13 @@ def run(course: cfg.Course, argv) -> int:
             missing_repos += 1
             out.bad_line(label, f"no such repository: {full_repo}")
             continue
-        before: Dict[str, str] = gh.tree(full_repo) if args.go else {}
+        before: Dict[str, str] = gh.tree(full_repo) if (args.go or args.missing) else {}
         outcomes = []
         for name, data in payload.items():
+            if args.missing and name in before:
+                # Exists, whatever its content: not ours to touch.
+                outcomes.append(f"{name}: same")
+                continue
             try:
                 outcome = ghcli.put_file(full_repo, name, data, message, dry_run=not args.go)
             except RuntimeError as exc:
@@ -180,11 +211,14 @@ def run(course: cfg.Course, argv) -> int:
                     deliverables_changed.append(f"{full_repo}:{path_}")
         if all(o.endswith(": same") for o in outcomes):
             skipped += 1
-            out.skip_line(label, "already current")
+            out.skip_line(label, "nothing missing" if args.missing else "already current")
         elif any("FAILED" in o for o in outcomes):
             out.bad_line(label, "; ".join(outcomes))
         else:
-            out.ok_line(label, "; ".join(outcomes))
+            # With --missing, "same" means "exists, left alone" and is noise
+            # next to the files that were actually added.
+            shown = [o for o in outcomes if not (args.missing and o.endswith(": same"))]
+            out.ok_line(label, "; ".join(shown))
 
     out.say()
     out.say(f"{changed} file write(s), {skipped} repo(s) already current, "
@@ -202,6 +236,7 @@ def run(course: cfg.Course, argv) -> int:
     else:
         out.say("0 deliverables would be changed (patch only ever writes the files listed above)")
         out.preview_footer(f"{course.course} patch {a.id}"
+                           + (" --missing" if args.missing else "")
                            + (f" --files {args.files}" if args.files else "")
                            + (f" --students {args.students}" if args.students else ""))
     return 1 if failed or deliverables_changed else 0

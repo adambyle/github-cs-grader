@@ -107,6 +107,11 @@ Something in a grader is non-deterministic: a clock, an unordered
 iteration, randomness, an attempted network call. Fix it before the marks
 mean anything. Compare `gradebook.csv` and `gradebook.second.csv`.
 
+**I added a file to the starter and existing repos do not have it.**
+`cs108 patch a04 --missing --go` creates it in every repository that lacks
+it and touches nothing else. If the file is provided (not the student's
+work), also put it on `restore` so later fixes to it can be pushed.
+
 **`patch` refuses a file.**
 It is not on the restore list, so students may have edited it. If it truly
 is a provided file, add it to `restore` in `assignment.json` (that is the
