@@ -15,6 +15,7 @@ import tempfile
 os.environ["HUEY_DB"] = os.path.join(tempfile.mkdtemp(prefix="coursekit-test-"), "huey.db")
 
 import pytest  # noqa: E402
+import respx  # noqa: E402
 from cryptography.fernet import Fernet  # noqa: E402
 from cryptography.hazmat.primitives import serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: E402
@@ -25,6 +26,15 @@ from webapp.tasks import huey  # noqa: E402
 
 WEBHOOK_SECRET = "test-webhook-secret"
 TOKEN_KEY = Fernet.generate_key().decode()
+
+
+@pytest.fixture(autouse=True)
+def http_mock():
+    """Any HTTP request a test has not mocked fails at once, instead of
+    quietly reaching the real GitHub. Tests can add routes to it by taking
+    this fixture, or use their own @respx.mock, which takes precedence."""
+    with respx.mock(assert_all_called=False) as router:
+        yield router
 
 
 @pytest.fixture(scope="session")

@@ -14,7 +14,7 @@ import os
 from contextlib import contextmanager
 
 from flask import current_app, has_app_context
-from huey import SqliteHuey
+from huey import SqliteHuey, crontab
 
 log = logging.getLogger(__name__)
 
@@ -53,9 +53,9 @@ def ping() -> str:
 
 @huey.task()
 def process_webhook(delivery_pk: int) -> None:
-    """Act on one recorded webhook. For now it only logs what arrived; grading
-    on push is added by the grading spec."""
+    """Act on one recorded webhook: github/handlers.py decides what."""
     from .extensions import db
+    from .github import handlers
     from .models import WebhookDelivery
 
     with app_context():
@@ -63,15 +63,16 @@ def process_webhook(delivery_pk: int) -> None:
         if delivery is None:
             log.warning("webhook %s vanished before it was processed", delivery_pk)
             return
-        payload = delivery.payload
-        repo = (payload.get("repository") or {}).get("full_name", "-")
-        if delivery.event == "push":
-            head = (payload.get("head_commit") or {}).get("id", "")[:7] or "-"
-            log.info("push to %s (%s), head %s", repo, payload.get("ref"), head)
-        else:
-            log.info(
-                "%s%s from %s",
-                delivery.event,
-                f".{delivery.action}" if delivery.action else "",
-                repo,
-            )
+        handlers.dispatch(delivery)
+
+
+@huey.periodic_task(crontab(hour="3", minute="15"))
+def nightly_sync() -> None:
+    """Re-read everything GitHub might have told us about by a webhook we
+    missed (GitHub does not retry failed deliveries)."""
+    from .github import installations
+    from .github.app_auth import github_app
+
+    with app_context():
+        installations.sync(github_app())
+        log.info("nightly sync: installations refreshed")

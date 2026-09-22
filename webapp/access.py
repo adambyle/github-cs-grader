@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import g, redirect, request, session, url_for
+from flask import abort, g, redirect, request, session, url_for
 
 from .extensions import db
-from .models import User
+from .models import Course, CourseStaff, Offering, User
 
 
 def may_use_instructor_mode(user: User) -> bool:
@@ -64,6 +64,64 @@ def instructor_mode_required(view):
     def wrapped(*args, **kwargs):
         if g.user.mode != "instructor":
             return redirect(url_for("home.index"))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+# -- courses ---------------------------------------------------------------
+
+
+def staff_role(user: User, course: Course) -> str | None:
+    """'owner', 'instructor', or None when the user is not on the staff."""
+    return db.session.scalar(
+        db.select(CourseStaff.role).where(
+            CourseStaff.course_id == course.id, CourseStaff.user_id == user.id
+        )
+    )
+
+
+def staff_courses(user: User) -> list[Course]:
+    return list(
+        db.session.scalars(
+            db.select(Course)
+            .join(CourseStaff)
+            .where(CourseStaff.user_id == user.id)
+            .order_by(Course.code)
+        )
+    )
+
+
+def course_staff_required(view):
+    """For routes with <int:course_id>: sets g.course and g.staff_role, or
+    404s. Not 403: people off the staff are not told the course exists."""
+
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        course = db.session.get(Course, kwargs["course_id"])
+        role = staff_role(g.user, course) if course else None
+        if role is None:
+            abort(404)
+        g.course, g.staff_role = course, role
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def offering_staff_required(view):
+    """For routes with <int:offering_id>: sets g.offering, g.course and
+    g.staff_role, or 404s. Roster members get their own check with the
+    roster."""
+
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        offering = db.session.get(Offering, kwargs["offering_id"])
+        role = staff_role(g.user, offering.course) if offering else None
+        if role is None:
+            abort(404)
+        g.offering, g.course, g.staff_role = offering, offering.course, role
         return view(*args, **kwargs)
 
     return wrapped

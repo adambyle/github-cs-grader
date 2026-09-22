@@ -17,6 +17,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, render_template
 from huey.exceptions import HueyException
 
+from ..github import installations
 from ..github.app_auth import GitHubError, github_app
 
 bp = Blueprint("dev", __name__, url_prefix="/dev")
@@ -27,6 +28,7 @@ def github():
     gh = github_app()
     error, rows = None, []
     try:
+        installations.sync(gh)  # keep the installations table honest too
         for inst in gh.installations():
             row = {
                 "id": inst["id"],

@@ -34,11 +34,15 @@ def create_app(settings: dict | None = None) -> Flask:
     from .access import load_current_user
     from .github.webhooks import bp as webhooks_bp
     from .routes.auth import bp as auth_bp
+    from .routes.connect import bp as connect_bp
+    from .routes.courses import bp as courses_bp
     from .routes.health import bp as health_bp
     from .routes.home import bp as home_bp
 
     app.before_request(load_current_user)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(connect_bp)
+    app.register_blueprint(courses_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(home_bp)
     app.register_blueprint(webhooks_bp)

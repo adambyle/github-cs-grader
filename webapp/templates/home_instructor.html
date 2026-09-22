@@ -3,6 +3,19 @@
 {% block content %}
 <div class="page-head">
   <h1>Your courses</h1>
+  <a class="button" href="{{ url_for('courses.new_course') }}">New course</a>
 </div>
-<p class="muted">You have no courses yet. Creating courses arrives in the next step.</p>
+{% if courses %}
+<table>
+  <tr><th>Course</th><th>Offerings</th></tr>
+  {% for c in courses %}
+  <tr>
+    <td><a href="{{ url_for('courses.course', course_id=c.id) }}">{{ c.code }} · {{ c.title }}</a></td>
+    <td>{% for o in c.offerings %}<a href="{{ url_for('courses.offering', offering_id=o.id) }}">{{ o.label }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">You have no courses yet.</p>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}New course · coursekit{% endblock %}
+{% block content %}
+<h1>New course</h1>
+<form method="post" action="{{ url_for('courses.create_course') }}" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Code <input name="code" value="{{ form.code or '' }}" placeholder="CS 108" required></label>
+  <label>Title <input name="title" value="{{ form.title or '' }}" placeholder="Web Programming" required></label>
+  <div><button type="submit" class="primary">Create course</button></div>
+</form>
+{% endblock %}

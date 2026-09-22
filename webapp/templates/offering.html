@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ course.code }} {{ offering.label }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> / <a href="{{ url_for('courses.course', course_id=course.id) }}">{{ course.code }}</a> /</p>
+<h1>{{ course.code }} · {{ offering.label }}</h1>
+
+<section class="panel">
+  <h2>GitHub organization</h2>
+  {% set inst = offering.installation %}
+  {% if inst and inst.state == 'connected' %}
+    <p><a href="https://github.com/{{ inst.account_login }}">{{ inst.account_login }}</a> <span class="good">· coursekit installed</span></p>
+    {% if inst.repository_selection != 'all' %}
+      <p class="bad">coursekit can only see selected repositories in this organization. It needs <strong>All repositories</strong>:
+        <a href="https://github.com/organizations/{{ inst.account_login }}/settings/installations/{{ inst.id }}">change it on GitHub</a>.</p>
+    {% endif %}
+  {% elif inst and inst.state == 'suspended' %}
+    <p class="bad">An owner of {{ inst.account_login }} suspended coursekit. Nothing can be changed on GitHub until it is unsuspended
+      (<a href="https://github.com/organizations/{{ inst.account_login }}/settings/installations/{{ inst.id }}">organization settings</a>).</p>
+  {% else %}
+    {% if inst and inst.state == 'removed' %}
+      <p class="bad">coursekit was removed from {{ inst.account_login }}. Reconnect it below.</p>
+    {% endif %}
+    <ol class="steps">
+      <li><a href="https://github.com/account/organizations/new" target="_blank" rel="noopener">Create an organization on GitHub</a> for this semester. The free plan is enough.</li>
+      <li><a class="button" href="{{ url_for('connect.start', offering_id=offering.id) }}">Connect organization</a>
+        <span class="muted">Install coursekit on it and choose <strong>All repositories</strong>.</span></li>
+    </ol>
+    {% if choices %}
+      <form method="post" action="{{ url_for('connect.choose', offering_id=offering.id) }}" class="row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Or choose an organization where coursekit is already installed:
+          <select name="installation_id">
+            {% for c in choices %}<option value="{{ c.id }}">{{ c.account_login }}</option>{% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="button secondary">Use this organization</button>
+      </form>
+    {% elif choices_error == 'sign-in' %}
+      <p class="muted">Sign out and in again to list organizations where coursekit is already installed.</p>
+    {% elif choices_error %}
+      <p class="muted">Couldn't list existing installations: {{ choices_error }}</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Roster</h2>
+  <p class="muted">Uploading a roster comes next.</p>
+</section>
+{% endblock %}

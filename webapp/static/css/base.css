@@ -55,3 +55,16 @@ th, td { border-bottom: 1px solid var(--line); padding: 0.4rem 0.6rem; text-alig
 th { font-weight: 600; color: var(--muted); }
 .good { color: var(--good); }
 .bad { color: var(--bad); }
+
+h2 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+.panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.25rem 1rem 1rem; margin: 1rem 0; }
+.panel h2 { margin-top: 0.75rem; }
+.crumbs { color: var(--muted); margin: 0 0 0.25rem; }
+.crumbs a { color: inherit; }
+form.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.75rem 0; }
+form.stack { display: flex; flex-direction: column; gap: 0.75rem; max-width: 28rem; }
+form.stack label { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
+input, select { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); }
+ol.steps { padding-left: 1.25rem; }
+ol.steps li { margin: 0.5rem 0; }

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ course.code }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> /</p>
+<h1>{{ course.code }} · {{ course.title }}</h1>
+
+<h2>Offerings</h2>
+{% if course.offerings %}
+<table>
+  <tr><th>Semester</th><th>GitHub organization</th></tr>
+  {% for o in course.offerings %}
+  <tr>
+    <td><a href="{{ url_for('courses.offering', offering_id=o.id) }}">{{ o.label }}</a></td>
+    <td>{% if o.installation and o.installation.state == 'connected' %}{{ o.org_login }}{% else %}<span class="muted">not connected</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">No offerings yet.</p>
+{% endif %}
+<form method="post" action="{{ url_for('courses.create_offering', course_id=course.id) }}" class="row">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input name="label" placeholder="Fall 2026" required aria-label="Semester">
+  <button type="submit" class="primary">Add offering</button>
+</form>
+
+<h2>Staff</h2>
+<table>
+  <tr><th>GitHub account</th><th>Role</th></tr>
+  {% for s in course.staff %}
+  <tr><td>{{ s.user.login }}{% if s.user.name %} <span class="muted">({{ s.user.name }})</span>{% endif %}</td><td>{{ s.role }}</td></tr>
+  {% endfor %}
+</table>
+{% if g.staff_role == 'owner' %}
+<form method="post" action="{{ url_for('courses.add_staff', course_id=course.id) }}" class="row">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input name="login" placeholder="GitHub username" required aria-label="GitHub username">
+  <button type="submit" class="button secondary">Add co-instructor</button>
+</form>
+<p class="muted">Co-instructors must have signed in to coursekit once.</p>
+{% endif %}
+{% endblock %}
