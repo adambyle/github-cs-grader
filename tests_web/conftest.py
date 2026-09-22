@@ -51,7 +51,7 @@ def environ(tmp_path, key_file):
     return {
         "FLASK_SECRET_KEY": "test",
         "DATABASE_URL": f"sqlite:///{tmp_path / 'test.db'}",
-        "BASE_URL": "http://localhost:5000/",
+        "BASE_URL": "http://localhost/",  # the test client's host; trailing slash on purpose
         "GITHUB_APP_ID": "12345",
         "GITHUB_APP_SLUG": "coursekit-test",
         "GITHUB_APP_CLIENT_ID": "Iv23test",

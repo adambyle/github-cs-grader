@@ -62,11 +62,10 @@ def users(app):
 def test_login_sends_state_and_pkce(client):
     q = start_login(client)
     assert q["client_id"] == "Iv23test"
-    assert q["redirect_uri"] == "http://localhost:5000/auth/github/callback"
+    assert q["redirect_uri"] == "http://localhost/auth/github/callback"
     assert q["code_challenge_method"] == "S256"
     with client.session_transaction() as s:
-        pending = s["oauth"]
-    assert pending["state"] == q["state"]
+        pending = s["oauth_pending"][q["state"]]
     digest = hashlib.sha256(pending["verifier"].encode()).digest()
     assert base64.urlsafe_b64encode(digest).rstrip(b"=").decode() == q["code_challenge"]
 
@@ -92,7 +91,7 @@ def test_callback_signs_in_and_stores_encrypted_tokens(app, client):
         assert crypto.decrypt(stored.refresh_token_enc) == "ghr_refresh"
     with client.session_transaction() as s:
         assert s["user_id"] == user.id
-        assert "oauth" not in s
+        assert "oauth_pending" not in s
     assert "octocat" in client.get("/").text
 
 
@@ -116,6 +115,31 @@ def test_callback_with_wrong_state_is_refused(app, client):
 def test_callback_without_starting_is_refused(app, client):
     resp = client.get("/auth/github/callback?code=abc&state=x", follow_redirects=True)
     assert "start here or has expired" in resp.text  # "didn't" is HTML-escaped
+
+
+@respx.mock
+def test_two_sign_ins_in_flight_do_not_clobber_each_other(app, client):
+    first = start_login(client)
+    start_login(client)  # a second tab, or a double click
+    mock_github()
+    client.get(f"/auth/github/callback?code=a&state={first['state']}")
+    assert [u.login for u in users(app)] == ["octocat"]
+
+
+@respx.mock
+def test_repeated_callback_after_signing_in_is_quiet(app, client):
+    q = start_login(client)
+    mock_github()
+    client.get(f"/auth/github/callback?code=a&state={q['state']}")
+    resp = client.get(f"/auth/github/callback?code=a&state={q['state']}", follow_redirects=True)
+    assert "start here" not in resp.text
+    assert "octocat" in resp.text
+
+
+def test_login_moves_to_the_base_url_host_first(client):
+    resp = client.get("/login?as=instructor", base_url="http://127.0.0.1:5000")
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "http://localhost/login?as=instructor"
 
 
 def test_cancelled_sign_in(client):

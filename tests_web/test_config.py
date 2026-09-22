@@ -6,7 +6,7 @@ from webapp import config
 def test_complete_environment_loads(environ):
     settings = config.load(environ)
     assert settings["GITHUB_APP_ID"] == "12345"
-    assert settings["BASE_URL"] == "http://localhost:5000"  # trailing slash dropped
+    assert settings["BASE_URL"] == "http://localhost"  # trailing slash dropped
 
 
 def test_every_missing_variable_is_named_at_once(environ):
