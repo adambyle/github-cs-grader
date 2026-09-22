@@ -68,3 +68,4 @@ input, select { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--
   background: var(--bg); color: var(--fg); }
 ol.steps { padding-left: 1.25rem; }
 ol.steps li { margin: 0.5rem 0; }
+.button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }

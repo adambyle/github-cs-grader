@@ -6,7 +6,9 @@ Courses and their offerings (semesters).
     GET  /courses/<id>                        offerings and staff (staff only)
     POST /courses/<id>/offerings              add a semester
     POST /courses/<id>/staff                  add a co-instructor (owner only)
+    POST /courses/<id>/staff/<user>/remove    remove someone else from the staff (owner only)
     GET  /offerings/<id>                      the offering page (staff only, for now)
+    POST /offerings/<id>/delete               delete a semester (owner only)
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ def create_course():
     form = {k: request.form.get(k, "").strip() for k in ("code", "title")}
     errors = []
     if not form["code"]:
-        errors.append("A course code is required, e.g. CS 108.")
+        errors.append("A course code is required, e.g. CS 112.")
     if not form["title"]:
         errors.append("A title is required.")
     if errors:
@@ -101,6 +103,27 @@ def add_staff(course_id):
     return redirect(url_for("courses.course", course_id=course_id))
 
 
+@bp.post("/courses/<int:course_id>/staff/<int:user_id>/remove")
+@course_staff_required
+def remove_staff(course_id, user_id):
+    if g.staff_role != "owner":
+        abort(403)
+    if user_id == g.user.id:
+        flash("You can't remove yourself from the staff.")
+        return redirect(url_for("courses.course", course_id=course_id))
+    member = db.session.scalar(
+        db.select(CourseStaff).where(
+            CourseStaff.course_id == course_id, CourseStaff.user_id == user_id
+        )
+    )
+    if member is not None:
+        login = member.user.login
+        db.session.delete(member)
+        db.session.commit()
+        flash(f"{login} can no longer manage {g.course.code}.")
+    return redirect(url_for("courses.course", course_id=course_id))
+
+
 @bp.get("/offerings/<int:offering_id>")
 @offering_staff_required
 def offering(offering_id):
@@ -114,6 +137,18 @@ def offering(offering_id):
         choices=choices,
         choices_error=choices_error,
     )
+
+
+@bp.post("/offerings/<int:offering_id>/delete")
+@offering_staff_required
+def delete_offering(offering_id):
+    if g.staff_role != "owner":
+        abort(403)
+    label, course_id = g.offering.label, g.course.id
+    db.session.delete(g.offering)
+    db.session.commit()
+    flash(f"Deleted {g.course.code} {label}. Nothing on GitHub was changed.")
+    return redirect(url_for("courses.course", course_id=course_id))
 
 
 def _installable_orgs():

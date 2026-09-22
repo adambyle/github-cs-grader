@@ -111,7 +111,7 @@ class Installation(db.Model):
 
 
 class Course(db.Model):
-    """A course that is taught again and again (CS 108). Semesters are
+    """A course that is taught again and again (CS 112). Semesters are
     Offerings. Managed by its staff; see access.py."""
 
     __tablename__ = "courses"

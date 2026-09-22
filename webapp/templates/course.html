@@ -26,9 +26,21 @@
 
 <h2>Staff</h2>
 <table>
-  <tr><th>GitHub account</th><th>Role</th></tr>
+  <tr><th>GitHub account</th><th>Role</th>{% if g.staff_role == 'owner' %}<th></th>{% endif %}</tr>
   {% for s in course.staff %}
-  <tr><td>{{ s.user.login }}{% if s.user.name %} <span class="muted">({{ s.user.name }})</span>{% endif %}</td><td>{{ s.role }}</td></tr>
+  <tr>
+    <td>{{ s.user.login }}{% if s.user.name %} <span class="muted">({{ s.user.name }})</span>{% endif %}</td>
+    <td>{{ s.role }}</td>
+    {% if g.staff_role == 'owner' %}
+    <td>{% if s.user_id != g.user.id %}
+      <form method="post" action="{{ url_for('courses.remove_staff', course_id=course.id, user_id=s.user_id) }}" class="inline"
+            data-confirm="Remove {{ s.user.login }} from the {{ course.code }} staff?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Remove</button>
+      </form>
+    {% endif %}</td>
+    {% endif %}
+  </tr>
   {% endfor %}
 </table>
 {% if g.staff_role == 'owner' %}

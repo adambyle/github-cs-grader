@@ -40,6 +40,7 @@ def create_app(settings: dict | None = None) -> Flask:
     from .routes.home import bp as home_bp
 
     app.before_request(load_current_user)
+    app.after_request(_no_store_pages)
     app.register_blueprint(auth_bp)
     app.register_blueprint(connect_bp)
     app.register_blueprint(courses_bp)
@@ -53,3 +54,12 @@ def create_app(settings: dict | None = None) -> Flask:
         app.register_blueprint(dev_bp)
 
     return app
+
+
+def _no_store_pages(response):
+    """Pages show live data (courses, connection state), so the browser must
+    ask again rather than reuse a copy, including when going Back. Static
+    files are unaffected."""
+    if response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-store"
+    return response

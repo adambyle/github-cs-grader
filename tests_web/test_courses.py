@@ -77,3 +77,43 @@ def test_missing_fields(client, make_user, app):
     assert client.post("/courses", data={"code": "", "title": ""}).status_code == 400
     with app.app_context():
         assert db.session.scalar(db.select(db.func.count(Course.id))) == 0
+
+
+def _course_with_co_instructor(app, client, make_user):
+    prof, co = make_user("prof", mode="instructor"), make_user("co-prof")
+    sign_in_as(client, prof)
+    course_id = create_course(client)
+    client.post(f"/courses/{course_id}/staff", data={"login": "co-prof"})
+    return prof, co, course_id
+
+
+def test_owner_removes_co_instructor_but_not_themselves(app, client, make_user):
+    prof, co, course_id = _course_with_co_instructor(app, client, make_user)
+    resp = client.post(f"/courses/{course_id}/staff/{prof.id}/remove", follow_redirects=True)
+    assert "remove yourself" in resp.text
+    resp = client.post(f"/courses/{course_id}/staff/{co.id}/remove", follow_redirects=True)
+    assert "co-prof can no longer manage CS 108" in resp.text
+    sign_in_as(client, co)
+    assert client.get(f"/courses/{course_id}").status_code == 404
+
+
+def test_co_instructor_cannot_remove_staff_or_delete_offerings(app, client, make_user):
+    prof, co, course_id = _course_with_co_instructor(app, client, make_user)
+    client.post(f"/courses/{course_id}/offerings", data={"label": "Fall 2026"})
+    with app.app_context():
+        offering_id = db.session.scalar(db.select(Offering.id))
+    sign_in_as(client, co)
+    assert client.post(f"/courses/{course_id}/staff/{prof.id}/remove").status_code == 403
+    assert client.post(f"/offerings/{offering_id}/delete").status_code == 403
+
+
+def test_owner_deletes_offering(app, client, make_user):
+    sign_in_as(client, make_user("prof", mode="instructor"))
+    course_id = create_course(client)
+    client.post(f"/courses/{course_id}/offerings", data={"label": "Fall 2026"})
+    with app.app_context():
+        offering_id = db.session.scalar(db.select(Offering.id))
+    resp = client.post(f"/offerings/{offering_id}/delete", follow_redirects=True)
+    assert "Deleted CS 108 Fall 2026" in resp.text
+    with app.app_context():
+        assert db.session.scalar(db.select(db.func.count(Offering.id))) == 0

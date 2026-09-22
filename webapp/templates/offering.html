@@ -13,9 +13,19 @@
       <p class="bad">coursekit can only see selected repositories in this organization. It needs <strong>All repositories</strong>:
         <a href="https://github.com/organizations/{{ inst.account_login }}/settings/installations/{{ inst.id }}">change it on GitHub</a>.</p>
     {% endif %}
+    <form method="post" action="{{ url_for('connect.disconnect', offering_id=offering.id) }}" class="row"
+          data-confirm="Disconnect {{ inst.account_login }} from {{ course.code }} {{ offering.label }}? coursekit stays installed on the organization, and nothing on GitHub changes.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button secondary">Disconnect organization</button>
+    </form>
   {% elif inst and inst.state == 'suspended' %}
     <p class="bad">An owner of {{ inst.account_login }} suspended coursekit. Nothing can be changed on GitHub until it is unsuspended
       (<a href="https://github.com/organizations/{{ inst.account_login }}/settings/installations/{{ inst.id }}">organization settings</a>).</p>
+    <form method="post" action="{{ url_for('connect.disconnect', offering_id=offering.id) }}" class="row"
+          data-confirm="Disconnect {{ inst.account_login }} from {{ course.code }} {{ offering.label }}? coursekit stays installed on the organization, and nothing on GitHub changes.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button secondary">Disconnect organization</button>
+    </form>
   {% else %}
     {% if inst and inst.state == 'removed' %}
       <p class="bad">coursekit was removed from {{ inst.account_login }}. Reconnect it below.</p>
@@ -47,4 +57,15 @@
   <h2>Roster</h2>
   <p class="muted">Uploading a roster comes next.</p>
 </section>
+
+{% if g.staff_role == 'owner' %}
+<section class="panel">
+  <h2>Delete offering</h2>
+  <form method="post" action="{{ url_for('courses.delete_offering', offering_id=offering.id) }}" class="row"
+        data-confirm="Delete {{ course.code }} {{ offering.label }}? This can't be undone. The GitHub organization and its repositories are not affected.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="button danger">Delete {{ offering.label }}</button>
+  </form>
+</section>
+{% endif %}
 {% endblock %}

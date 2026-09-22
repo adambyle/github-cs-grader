@@ -3,6 +3,7 @@ Connecting an offering to its GitHub org, through the App's installation.
 
     GET  /offerings/<id>/connect        off to GitHub's "install coursekit" page
     POST /offerings/<id>/installation   choose an org where it is already installed
+    POST /offerings/<id>/disconnect     unlink the org (nothing changes on GitHub)
     GET  /github/installed              the App's Setup URL: GitHub sends people
                                         back here after installing
 
@@ -117,6 +118,20 @@ def choose(offering_id):
     if not installation_id:
         abort(400)
     _link_and_report(g.offering, installation_id)
+    return redirect(url_for("courses.offering", offering_id=offering_id))
+
+
+@bp.post("/offerings/<int:offering_id>/disconnect")
+@offering_staff_required
+def disconnect(offering_id):
+    org = g.offering.org_login
+    g.offering.installation = None
+    db.session.commit()
+    if org:
+        flash(
+            f"Disconnected {org}. coursekit is still installed on it; uninstall it on GitHub "
+            "if it's no longer needed."
+        )
     return redirect(url_for("courses.offering", offering_id=offering_id))
 
 

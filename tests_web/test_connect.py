@@ -148,3 +148,14 @@ def test_removed_installation_shows_reconnect(app, client, offering_id):
     # GitHub no longer lists it either (otherwise the page would rightly revive it)
     route.return_value = httpx.Response(200, json={"total_count": 0, "installations": []})
     assert "was removed from cs108-26fa" in client.get(f"/offerings/{offering_id}").text
+
+
+@respx.mock
+def test_disconnect_unlinks_but_keeps_the_installation(app, client, offering_id):
+    visible(ORG_INSTALL)
+    client.post(f"/offerings/{offering_id}/installation", data={"installation_id": 777})
+    resp = client.post(f"/offerings/{offering_id}/disconnect", follow_redirects=True)
+    assert "Disconnected cs108-26fa" in resp.text
+    assert org_of(app, offering_id) is None
+    with app.app_context():
+        assert db.session.get(Installation, 777).state == "connected"

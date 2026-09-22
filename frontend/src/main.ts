@@ -22,3 +22,13 @@ document.addEventListener("submit", (event) => {
     event.preventDefault();
   }
 });
+
+// Going Back can show a page restored from the browser's memory, with data
+// that has since changed (a course that just gained an offering). The
+// server sends no-store, but not every browser honors it for Back; reload
+// any restored page.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
