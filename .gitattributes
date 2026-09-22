@@ -1,0 +1,8 @@
+# LF everywhere, whatever core.autocrlf says: these files are read inside Linux
+# containers, where a CRLF in a shell script or config fails confusingly
+# (/bin/sh^M: not found).
+* text=auto eol=lf
+
+*.pdf binary
+*.png binary
+*.jpg binary
