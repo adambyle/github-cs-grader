@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="landing">
+  <h1>coursekit</h1>
+  <div class="choices">
+    <a class="button" href="{{ url_for('auth.login', as='student', next=next) }}">Sign in as a student</a>
+    <a class="button" href="{{ url_for('auth.login', as='instructor', next=next) }}">Sign in as an instructor</a>
+  </div>
+  <p class="muted">Sign in with your GitHub account.</p>
+</section>
+{% endblock %}

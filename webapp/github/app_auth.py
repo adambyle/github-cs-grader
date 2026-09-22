@@ -66,6 +66,15 @@ class GitHubApp:
         """Every organization or account that has installed the App."""
         return self._app_get("/app/installations?per_page=100")
 
+    def installation(self, installation_id: int) -> dict:
+        """One installation, as the App sees it."""
+        return self._app_get(f"/app/installations/{installation_id}")
+
+    def forget_token(self, installation_id: int) -> None:
+        """Drop a cached token (the installation was removed or suspended)."""
+        with self._lock:
+            self._tokens.pop(installation_id, None)
+
     def installation_token(self, installation_id: int) -> str:
         with self._lock:
             cached = self._tokens.get(installation_id)

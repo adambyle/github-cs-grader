@@ -2,6 +2,7 @@
 
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
@@ -13,6 +14,7 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
+csrf = CSRFProtect()  # every POST form carries csrf_token(); webhooks are exempt
 
 
 @event.listens_for(Engine, "connect")
