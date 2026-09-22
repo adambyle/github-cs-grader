@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}GitHub App check{% endblock %}
+{% block content %}
+<h1>GitHub App check</h1>
+{% if error %}
+  <p class="bad">Could not list installations: {{ error }}</p>
+  <p>Check GITHUB_APP_ID and the private key in .env.</p>
+{% elif not rows %}
+  <p>The credentials work, but the App is not installed anywhere yet.
+     <a href="{{ install_url }}">Install it on your dev organization.</a></p>
+{% else %}
+  <p class="good">The App's credentials work.</p>
+  <table>
+    <tr><th>Installation</th><th>Account</th><th>Type</th><th>Repositories</th><th>Token</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.id }}</td><td>{{ r.account }}</td><td>{{ r.type }}</td>
+      <td>{{ r.selection }}{% if r.repos is not none %} ({{ r.repos }}){% endif %}</td>
+      <td>{% if r.error %}<span class="bad">{{ r.error }}</span>{% else %}<span class="good">ok</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p><a href="{{ install_url }}">Install on another account</a></p>
+{% endif %}
+{% endblock %}

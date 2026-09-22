@@ -1,0 +1,13 @@
+# Tool settings only; nothing here is packaged.
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+extend-exclude = ["examples", "Claude outputs", "migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests_web"]
+pythonpath = ["."]

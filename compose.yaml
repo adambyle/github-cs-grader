@@ -1,0 +1,55 @@
+# Development only. `docker compose up --build`, then http://localhost:5000.
+# See expansion/agent-spec/create-environment.md.
+
+x-app: &app
+  build:
+    context: .
+    target: dev
+  image: coursekit-dev
+  env_file: .env
+  volumes:
+    - .:/app
+    - coursekit-data:/data
+    # The app always reads the key from this fixed path; only .env knows
+    # where it lives on your machine.
+    - ${GITHUB_APP_PRIVATE_KEY_FILE:?set GITHUB_APP_PRIVATE_KEY_FILE in .env}:/run/secrets/github-app.pem:ro
+
+services:
+  web:
+    <<: *app
+    command: flask --app webapp run --host 0.0.0.0 --port 5000 --debug
+    environment:
+      COURSEKIT_DEV_ROUTES: "1"
+    ports:
+      - "5000:5000"
+
+  worker:
+    <<: *app
+    # Not auto-reloaded: `docker compose restart worker` after changing tasks.
+    command: huey_consumer webapp.tasks.huey
+    depends_on:
+      - web
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app/frontend
+    volumes:
+      - .:/app
+      # Linux packages stay in the container, not in the Windows folder.
+      - /app/frontend/node_modules
+    environment:
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      # File-change events do not cross Windows bind mounts reliably; poll.
+      TSC_WATCHFILE: DynamicPriorityPolling
+      TSC_WATCHDIRECTORY: DynamicPriorityPolling
+    command: sh -c "npm ci --no-audit --no-fund && npx tsc --watch --preserveWatchOutput"
+
+  smee:
+    image: node:22-slim
+    command: sh -c "npx --yes smee-client --url \"$$SMEE_URL\" --target http://web:5000/webhooks/github"
+    env_file: .env
+    depends_on:
+      - web
+
+volumes:
+  coursekit-data:

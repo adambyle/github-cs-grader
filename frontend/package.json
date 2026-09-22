@@ -1,0 +1,12 @@
+{
+  "name": "coursekit-frontend",
+  "private": true,
+  "description": "TypeScript for the coursekit pages, compiled to webapp/static/js/ by tsc alone.",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

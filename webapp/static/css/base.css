@@ -1,0 +1,11 @@
+/* Placeholder styling; the real design follows expansion/appearance.md. */
+:root { color-scheme: light dark; --fg: #111; --bg: #fff; --line: #ccc; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --line: #444; } }
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--line); font-weight: 600; }
+header a { color: inherit; text-decoration: none; }
+main { padding: 1.5rem; max-width: 60rem; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid var(--line); padding: 0.3rem 0.6rem; text-align: left; }
+.good { color: #1a7f37; }
+.bad { color: #cf222e; }

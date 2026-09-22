@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleDetection": "force",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "../webapp/static/js",
+    "sourceMap": true
+  },
+  "include": ["src"],
+  "watchOptions": {
+    "watchFile": "dynamicPriorityPolling",
+    "watchDirectory": "dynamicPriorityPolling"
+  }
+}
