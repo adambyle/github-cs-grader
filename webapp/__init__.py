@@ -16,7 +16,7 @@ import os
 from flask import Flask
 
 from . import config
-from .extensions import db, migrate
+from .extensions import csrf, db, migrate
 
 
 def create_app(settings: dict | None = None) -> Flask:
@@ -29,14 +29,20 @@ def create_app(settings: dict | None = None) -> Flask:
 
     db.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)  # batch mode: SQLite cannot ALTER much
+    csrf.init_app(app)
     from . import models  # noqa: F401  (registers the tables with SQLAlchemy)
+    from .access import load_current_user
     from .github.webhooks import bp as webhooks_bp
+    from .routes.auth import bp as auth_bp
     from .routes.health import bp as health_bp
     from .routes.home import bp as home_bp
 
+    app.before_request(load_current_user)
+    app.register_blueprint(auth_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(home_bp)
     app.register_blueprint(webhooks_bp)
+    csrf.exempt(webhooks_bp)  # GitHub signs its requests instead
     if app.config["DEV_ROUTES"]:
         from .routes.dev import bp as dev_bp
 

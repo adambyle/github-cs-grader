@@ -15,6 +15,7 @@ import tempfile
 os.environ["HUEY_DB"] = os.path.join(tempfile.mkdtemp(prefix="coursekit-test-"), "huey.db")
 
 import pytest  # noqa: E402
+from cryptography.fernet import Fernet  # noqa: E402
 from cryptography.hazmat.primitives import serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: E402
 
@@ -23,6 +24,7 @@ from webapp.extensions import db  # noqa: E402
 from webapp.tasks import huey  # noqa: E402
 
 WEBHOOK_SECRET = "test-webhook-secret"
+TOKEN_KEY = Fernet.generate_key().decode()
 
 
 @pytest.fixture(scope="session")
@@ -56,6 +58,7 @@ def environ(tmp_path, key_file):
         "GITHUB_APP_CLIENT_SECRET": "client-secret",
         "GITHUB_WEBHOOK_SECRET": WEBHOOK_SECRET,
         "GITHUB_APP_PRIVATE_KEY_PATH": str(key_file),
+        "TOKEN_ENCRYPTION_KEY": TOKEN_KEY,
     }
 
 
@@ -64,7 +67,8 @@ def app(environ):
     from webapp import config
 
     settings = config.load(environ)
-    settings.update(TESTING=True, DEV_ROUTES=False)
+    # CSRF is off for most tests; test_auth.py turns it on to check it.
+    settings.update(TESTING=True, DEV_ROUTES=False, WTF_CSRF_ENABLED=False)
     app = create_app(settings)
     huey.immediate = True  # tasks run inline, in memory
     with app.app_context():
@@ -76,3 +80,31 @@ def app(environ):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def make_user(app):
+    """make_user(login, mode=...) -> User, saved, with a stored token."""
+    from webapp import auth
+    from webapp.github.user_auth import TokenSet
+    from webapp.models import User
+
+    counter = iter(range(1000, 2000))
+
+    def make(login="ada", mode="student", **fields):
+        with app.app_context():
+            user = User(github_id=next(counter), login=login, mode=mode, **fields)
+            db.session.add(user)
+            auth.store_tokens(user, TokenSet(f"ghu_{login}", None, None, None))
+            db.session.commit()
+            db.session.refresh(user)
+            db.session.expunge(user)
+            return user
+
+    return make
+
+
+def sign_in_as(client, user):
+    """Sign a user in by writing the session directly (no OAuth round trip)."""
+    with client.session_transaction() as s:
+        s["user_id"] = user.id

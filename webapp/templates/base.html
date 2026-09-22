@@ -4,11 +4,42 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}coursekit{% endblock %}</title>
+  {# Apply a saved theme before first paint, so dark mode never flashes white. #}
+  <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; })();</script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </head>
 <body>
-  <header><a href="{{ url_for('home.index') }}">coursekit</a></header>
-  <main>{% block content %}{% endblock %}</main>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('home.index') }}">coursekit</a>
+    <nav>
+      {% if g.user %}
+        <span class="badge">{{ g.user.mode }}</span>
+        <form method="post" action="{{ url_for('auth.switch_mode') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% set other = 'student' if g.user.mode == 'instructor' else 'instructor' %}
+          <input type="hidden" name="mode" value="{{ other }}">
+          <button type="submit" class="link">Switch to {{ other }}</button>
+        </form>
+        <span class="who">
+          {% if g.user.avatar_url %}<img src="{{ g.user.avatar_url }}&s=40" alt="" width="20" height="20">{% endif %}
+          {{ g.user.login }}
+        </span>
+      {% endif %}
+      <button type="button" id="theme-toggle" class="link" title="Toggle light/dark theme">◐</button>
+      {% if g.user %}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link">Sign out</button>
+        </form>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% for m in messages %}<p class="flash">{{ m }}</p>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>
