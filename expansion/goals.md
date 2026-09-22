@@ -22,7 +22,9 @@ The instructor can upload a markdown file for the assignment instructions which 
 
 The instructor can view a dashboard of submissions for a certain assignment. They can see student-by-student statistics and important details, such as the number of errors on each commit, the time between commits and total time span between first and last commits, how many commits were past the due date, etc. The instructor can verify that no read-only files were modified. The dashboard returns the results of the autograding system and makes them visible to the instructor, and the instructor can export these grades as a worksheet for uploading to Moodle.
 
-An instructor adds students to a certain semester roster for a course by specifying their GitHub usernmame. This roster is initially uploaded as a CSV.
+An instructor adds students to a certain semester roster for a course by specifying their GitHub username. This roster is initially uploaded as a CSV.
+
+Each course and semester gets its own GitHub organization.
 
 ### Student
 
