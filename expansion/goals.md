@@ -6,7 +6,7 @@ author: Adam Byle
 
 While the current version of this app runs locally and is tailored for a single instructor of a single course, we'd like this tool to work remotely. A user specifies at login whether they are a student or an instructor. They can switch if they make a mistake. They then authenticate with GitHub.
 
-We will scrap the current web interface and build a new more sophisticated interface from scratch; however, this new interface should abide by the existing principles of web-based actions strongly mirroring those possible from the command line, at least from the instructor's point of view.
+We will scrap the current web interface and build a new more sophisticated interface from scratch.
 
 ## User flow
 

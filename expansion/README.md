@@ -9,3 +9,5 @@ This directory contains documentation and specification for an web-app-based exp
 Human-written markdown files like this one in this directory serve as highest-authority instructions and reference for the direction of the project. Agents may write their own specifications and notes in the `agent-spec` directory for planning and future reference.
 
 Agents are to annotate the top of all outputted markdown with an authorship attribution.
+
+Instead of running locally, this app will be deployed on university servers at a subdomain available to students and instructors.
