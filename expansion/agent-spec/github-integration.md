@@ -370,32 +370,43 @@ This phase sets up the base layout and header that every later page reuses.
 
 ## 11. Build order
 
-Each step is a commit or two, and each leaves the app working.
+Each step is a commit or two, and each leaves the app working. **After each
+step, stop and hand it to Adam to test before starting the next.**
 
-1. Spikes S1–S4. Record the results below.
-2. Flask-WTF, the base layout and header, the theme toggle.
-3. `User`/`UserToken` models, token encryption, sign-in and sign-out, the mode choice
-   and switch, the access decorators.
-4. `Installation` model, the webhook dispatcher and installation handlers, the
-   `/dev/github` page reading from the database.
-5. `Course`/`CourseStaff`/`Offering` models and pages.
-6. The connect flow: install redirect, setup URL verification, choosing an
-   existing installation, and the org panel states.
-7. `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one
-   row.
-8. Membership checks, the invitation task with backoff, `organization.*` handlers,
-   the nightly recheck.
-9. The student home page, the join banner, and the Join action.
-10. The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission
-    changed.
+| # | Step | Status |
+|---|---|---|
+| 1 | Spikes S1–S4 | **Done** (results below) |
+| 2 | Flask-WTF, the base layout and header, the theme toggle | **Done** |
+| 3 | `User`/`UserToken`, token encryption, sign-in/out, mode choice and switch, access decorators | **Done**, tested by Adam |
+| 4 | `Installation`, the webhook dispatcher and installation handlers, `/dev/github` syncing the database | **Done**, tested by Adam |
+| 5 | `Course`/`CourseStaff`/`Offering` and pages | **Done**, tested by Adam |
+| 6 | The connect flow: install redirect, setup URL check, choosing an existing installation, org panel states | **Done**, tested by Adam |
+| 7 | Rosters: `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one row | **Next**. Detailed plan: `roster.md` |
+| 8 | Membership checks, the invitation task with backoff, `organization.*` handlers, the nightly recheck | Planned |
+| 9 | The student home page, the join banner, the Join action | Planned |
+| 10 | The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission changed | Planned |
+
+### Where the build departed from this plan (steps 1–6)
+
+- **Mode is stored on `User`**, not in the session, so it survives signing out.
+- **Several sign-ins can be in flight at once** (keyed by `state`). A repeated
+  callback for someone already signed in is ignored quietly. `/login` first moves
+  to `BASE_URL`'s host, so the cookie comes back with GitHub's redirect.
+- **Offerings have only a `label`** ("Fall 2026"), not a separate term code.
+  There's no `pending_org_login`: when an owner's approval is needed, the
+  instructor comes back and picks the org from the list once it's approved.
+- **Added at Adam's request:** deleting an offering (owner only), disconnecting
+  its org (any staff member; the App stays installed), removing staff (owner only,
+  never yourself), and `Cache-Control: no-store` on pages plus a reload on Back,
+  so lists are never stale.
+- **Tests can't reach the network:** an autouse respx router fails any request a
+  test hasn't mocked.
 
 ## Spike results
 
-*(To be filled in during step 1.)*
-
 | Spike | Result | Consequence |
 |---|---|---|
-| S1 | | |
-| S2 | | |
-| S3 | | |
-| S4 | | |
+| S1 | Works end to end with the dev App, including PKCE (GitHub supports S256) and the first-time consent screen and Cancel. Adam tested it | None |
+| S2 | GitHub's permissions table lists `PATCH /user/memberships/orgs/{org}` as usable with a user token under Members: write. **Not yet tried for real** | Confirm in step 9. Keep the link to GitHub's invitation page as a fallback |
+| S3 | From GitHub's docs: **50 invitations per 24 hours** when the org is under a month old **and** on the free plan; otherwise 500 | Every new course org starts at 50. A class bigger than that needs the step 8 backoff on day one |
+| S4 | Not tested. Settled by rule instead: coursekit asks for **All repositories** and warns on the offering page when an org has selected repos only | Revisit only if an instructor needs "selected repositories" |

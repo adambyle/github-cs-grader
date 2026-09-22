@@ -14,7 +14,7 @@ they win, and this file should be updated.
 | # | Phase | Branch | Status | Spec |
 |---|---|---|---|---|
 | 0 | Development environment | `environment` | **Done** (merged) | `create-environment.md` |
-| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration` | **Next** | `github-integration.md` |
+| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration` | **In progress**: steps 1–6 done, rosters next | `github-integration.md`, `roster.md` |
 | 2 | Assignments: upload, versions, verify, template, repos, patch | — | Planned | to write |
 | 3 | Grading: sandbox, queue, per-commit grades, deadlines | — | Planned | to write, with `sandboxing.md` |
 | 4 | Dashboards and export: instructor stats, student feedback, Moodle | — | Planned | to write |
@@ -46,6 +46,12 @@ they win, and this file should be updated.
 - **Open/visible switch** per assignment.
 - **Hand-graded (`kind: manual`)** assignments are fully supported: no grader;
   `complete` is still computed.
+
+**Sequencing note:** `verify` needs phase 3's sandbox, because it runs the
+starter and answers. So either build the sandbox first (at the start of phase 2),
+or ship phase 2 with verify as "pending" and turn it on with phase 3. The
+sandbox is also the part IT is most likely to have opinions about
+(`deploy.md` §4), so starting it early is the safer choice.
 
 ### Phase 3: grading
 
@@ -145,6 +151,11 @@ way.
   app configures root logging (handled in `tasks.app_context`).
 - **smee.io forwarding keeps signatures valid** for compact JSON (verified with a real
   channel).
+- **Browsers restore pages from the back/forward cache**, showing stale lists.
+  Pages are sent `no-store`, and `main.ts` reloads any restored page.
+- **GitHub's app Configure page keeps Save disabled until something changes**, so
+  reconfiguring an already-installed org never reaches the Setup URL. The offering
+  page's "choose an existing org" list covers that case.
 - **The CLI's own test suite fails on Windows** (4 failures, 29 errors) *before and
   after* this work. It was written for macOS/Linux. Not a regression. Run it on
   Linux if needed.
@@ -159,8 +170,10 @@ way.
   assuming them.
 - Writes the direction in `expansion/*.md`. Agents write specs in `agent-spec/`
   with an `author:` front-matter line.
-- Wants a plan to review before building. Uses one branch per phase and merges
-  through PRs.
+- Wants a plan to review before building, then **one build step at a time**,
+  stopping for Adam to test after each. When asked for fixes, make only those.
+- Uses one branch per phase and merges through PRs.
+- No taglines or marketing copy in the UI; keep text functional.
 - Has told me to go with my recommendation wherever I'm leaning a certain way, and
   to use my own judgment otherwise. Record such decisions in this file.
 - Keeps secrets out of chat. Never read `.env` or `.pem` files. Check only that
@@ -172,8 +185,6 @@ way.
   (`webhooks.md`: GitHub needs HTTPS access), Docker socket policy, a separate
   grading VM, FERPA.
 - **Whether the App can accept an org invitation on a student's behalf** with their
-  user token. This is a spike at the start of phase 1.
-- **GitHub's daily cap on org invitations** for new or free orgs, and how it affects a
-  large first-day roster (phase 1).
+  user token. GitHub's docs say yes; confirm in phase 1, step 9.
 - **Whether the Actions tick stays.** Server-side grading makes it optional.
   Decide in phase 3.
