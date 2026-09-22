@@ -224,3 +224,34 @@ DATABASE_URL=sqlite:////data/coursekit.db
 
 Sign-in (GitHub OAuth), data models, grading, the sandbox, and production
 configuration each get their own spec. This plan only creates places for them.
+
+## Implementation notes (2026-09-22)
+
+Built as planned, with these departures, each found while testing:
+
+- **TypeScript is pinned to 6.0, not 7.** TypeScript 7 (the Go rewrite) never
+  noticed edits made through the Windows bind mount: it ignores
+  `TSC_WATCHFILE`, and `watchOptions` polling didn't help. 6.0 recompiles
+  within a few seconds. Moving to 7 is just a version bump once its watcher
+  supports polling. `tsconfig.json` also sets `moduleDetection: "force"`, because
+  pages load the scripts as ES modules.
+- **The App JWT's `iss` is the App ID** (`GITHUB_APP_ID`), not the client ID.
+  The client ID is kept for GitHub sign-in (OAuth) later.
+- **`/dev/worker`** was added beside `/dev/github`. It enqueues a ping task and
+  waits for the worker's answer. Dev routes are on only when
+  `COURSEKIT_DEV_ROUTES=1`, which compose.yaml sets for `web`.
+- **`HUEY_DB`** (the queue file, `/data/huey.db`) was added to `.env.example`.
+- **The first table is `webhook_deliveries`**, one row per verified webhook,
+  unique on GitHub's delivery ID so redeliveries are ignored.
+- **The `frontend` service keeps `node_modules` in an anonymous volume.** The
+  Linux packages stay inside the container, and an empty `frontend/node_modules`
+  folder appears on the host as the mount point.
+- **Ruff formats the code**, and `migrations/` is excluded because Alembic
+  generates it.
+
+Verified with dummy credentials in a separate compose project, since torn down:
+`/healthz`, `/dev/worker`, the Alembic migration, WAL mode, the `tsc` watcher, a
+signed webhook through a real smee.io channel reaching the worker, a redelivery
+ignored, a forged signature rejected, and `pytest` (15 tests) plus `ruff check`
+passing. What dummy credentials can't show is `/dev/github` succeeding: with the
+fake App ID GitHub answers "Integration not found", as it should.

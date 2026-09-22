@@ -4,3 +4,12 @@ __pycache__/
 
 # The Claude desktop app writes session outputs here; not part of the toolkit.
 Claude outputs/
+
+# Web app (see expansion/agent-spec/create-environment.md)
+.env
+.venv/
+*.pem
+webapp/static/js/
+frontend/node_modules/
+.pytest_cache/
+.ruff_cache/

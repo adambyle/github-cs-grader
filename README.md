@@ -78,3 +78,10 @@ diagnostic. Hand-graded assignments (`cs108 new a09 --kind manual`) skip
 - `examples/sample-course/`: a complete course with a JS-graded, a
   Python-graded and a manual assignment
 - `python3 tests/run_tests.py`: the offline test suite (no GitHub needed)
+
+## The web app (in development)
+
+`webapp/` is the start of a web version for many instructors and courses. It
+leaves the CLI above untouched. The plans are in `expansion/`. To run it you
+need only Docker: copy `.env.example` to `.env`, fill it in, then run
+`docker compose up --build`. See `expansion/agent-spec/create-environment.md`.
