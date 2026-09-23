@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Roster preview · {{ course.code }} {{ offering.label }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> / <a href="{{ url_for('courses.course', course_id=course.id) }}">{{ course.code }}</a> / <a href="{{ url_for('courses.offering', offering_id=offering.id) }}">{{ offering.label }}</a> / <a href="{{ url_for('roster.page', offering_id=offering.id) }}">Roster</a> /</p>
+<h1>Preview: {{ upload.filename }}</h1>
+<p class="muted">{{ 'Whole roster: people not in the file are dropped.' if p.mode == 'replace' else 'Add and update only: nobody is dropped.' }}</p>
+
+{% if upload.applied_at %}
+  <p class="flash">This upload was applied.</p>
+{% elif stale %}
+  <p class="flash bad">The roster changed after this preview was made. Upload the file again.</p>
+{% endif %}
+
+{% for note in p.notes %}<p class="flash">{{ note }}</p>{% endfor %}
+{% if p.github_error %}<p class="flash">Couldn't check GitHub usernames ({{ p.github_error }}). They'll be saved as not checked.</p>{% endif %}
+
+{% if p.problems %}
+<h2 class="bad">Problems ({{ p.problems|length }}): these rows won't be applied</h2>
+<table>
+  <tr><th>Line</th><th>Username</th><th>Problem</th></tr>
+  {% for x in p.problems %}<tr><td>{{ x.line }}</td><td>{{ x.username }}</td><td>{{ x.message }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+{% if p.not_found %}
+<h2 class="bad">GitHub usernames not found ({{ p.not_found|length }})</h2>
+<p>These rows are applied, but GitHub has no account by these names. They're usually typos.</p>
+<p>{{ p.not_found|join(', ') }}</p>
+{% endif %}
+
+{% macro gh(row) %}{% if row.github_login %}{{ row.github_login }}{% else %}<span class="muted">none yet</span>{% endif %}{% endmacro %}
+
+{% if p.new %}
+<h2>New ({{ p.new|length }})</h2>
+<table>
+  <tr><th>Username</th><th>Name</th><th>Email</th><th>Section</th><th>GitHub</th><th>Role</th></tr>
+  {% for r in p.new %}
+  <tr><td>{{ r.username }}</td><td>{{ r.first_name }} {{ r.last_name }}</td><td>{{ r.email }}</td><td>{{ r.section }}</td><td>{{ gh(r) }}</td><td>{{ r.role }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% for key, title in [('changed', 'Changed'), ('returning', 'Returning (were dropped)')] %}
+{% if p[key] %}
+<h2>{{ title }} ({{ p[key]|length }})</h2>
+<table>
+  <tr><th>Username</th><th>Name</th><th>Changes</th></tr>
+  {% for item in p[key] %}
+  <tr><td>{{ item.row.username }}</td><td>{{ name(item.row) }}</td>
+    <td>{% for f, (old, new) in item.changes.items() %}{{ labels[f] }}: <del>{{ old or '(blank)' }}</del> → {{ new or '(blank)' }}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">no other changes</span>{% endfor %}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endfor %}
+
+{% if p.dropped %}
+<h2>Dropped ({{ p.dropped|length }})</h2>
+<table>
+  <tr><th>Username</th><th>Name</th></tr>
+  {% for d in p.dropped %}<tr><td>{{ d.username }}</td><td>{{ d.name }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+{% if p.unchanged %}
+<details><summary>Unchanged ({{ p.unchanged|length }})</summary><p>{{ p.unchanged|join(', ') }}</p></details>
+{% endif %}
+
+{% set total = p.new|length + p.changed|length + p.returning|length + p.dropped|length %}
+{% if not upload.applied_at and not stale %}
+  {% if total %}
+  <form method="post" action="{{ url_for('roster.apply', offering_id=offering.id, upload_id=upload.id) }}" class="row"
+        {% if p.dropped %}data-confirm="Mark {{ p.dropped|length }} {{ 'person' if p.dropped|length == 1 else 'people' }} as dropped?"{% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="primary">Apply these changes</button>
+  </form>
+  {% else %}
+  <p>Nothing to change.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('roster.cancel', offering_id=offering.id, upload_id=upload.id) }}" class="row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="button secondary">Cancel</button>
+  </form>
+{% else %}
+  <p><a href="{{ url_for('roster.page', offering_id=offering.id) }}">Back to the roster</a></p>
+{% endif %}
+{% endblock %}

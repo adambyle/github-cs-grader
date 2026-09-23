@@ -84,6 +84,27 @@ def organization_renamed(payload: dict) -> None:
     log.info("org renamed to %s", payload["organization"]["login"])
 
 
+@on("organization", "member_invited", "member_added", "member_removed")
+def organization_membership(payload: dict) -> None:
+    from .. import membership
+
+    action = payload["action"]
+    if action == "member_invited":
+        invitation = payload.get("invitation") or {}
+        user, login, state = payload.get("user"), invitation.get("login"), "invited"
+    else:
+        user = (payload.get("membership") or {}).get("user")
+        login, state = None, "active" if action == "member_added" else "none"
+    changed = membership.from_webhook(payload["installation"]["id"], user, login, state)
+    log.info(
+        "%s in %s: %s roster row(s) now %s",
+        action,
+        payload["organization"]["login"],
+        changed,
+        state,
+    )
+
+
 @on("ping")
 def ping(payload: dict) -> None:
     log.info("GitHub says hello: %s", payload.get("zen", ""))

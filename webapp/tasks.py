@@ -66,13 +66,59 @@ def process_webhook(delivery_pk: int) -> None:
         handlers.dispatch(delivery)
 
 
+@huey.task()
+def send_invitations(offering_id: int) -> None:
+    """Invite an offering's queued roster rows (membership.py). If GitHub's
+    cap stops it, it schedules itself again for when GitHub says."""
+    from . import membership
+    from .extensions import db
+    from .github.app_auth import GitHubError
+    from .models import Offering
+
+    with app_context():
+        offering = db.session.get(Offering, offering_id)
+        if offering is None:
+            return
+        try:
+            resume = membership.send_invitations(offering)
+        except (GitHubError, membership.NotConnected) as exc:
+            db.session.rollback()
+            log.warning("invitations for offering %s stopped: %s", offering_id, exc)
+            return
+        if resume is not None:
+            send_invitations.schedule(args=(offering_id,), eta=resume)
+
+
+@huey.task()
+def check_memberships(offering_id: int) -> None:
+    """Re-read which roster rows are in the offering's org."""
+    from . import membership
+    from .extensions import db
+    from .models import Offering
+
+    with app_context():
+        offering = db.session.get(Offering, offering_id)
+        if offering is not None:
+            membership.safe_check(offering)
+
+
 @huey.periodic_task(crontab(hour="3", minute="15"))
 def nightly_sync() -> None:
     """Re-read everything GitHub might have told us about by a webhook we
     missed (GitHub does not retry failed deliveries)."""
+    from . import membership
+    from .extensions import db
     from .github import installations
     from .github.app_auth import github_app
+    from .models import Offering
 
     with app_context():
         installations.sync(github_app())
         log.info("nightly sync: installations refreshed")
+        for offering in db.session.scalars(db.select(Offering)):
+            if offering.installation is None or offering.installation.state != "connected":
+                continue
+            membership.safe_check(offering)
+            if any(e.membership == "queued" for e in offering.roster):
+                send_invitations(offering.id)
+        log.info("nightly sync: memberships rechecked")

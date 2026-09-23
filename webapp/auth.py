@@ -17,7 +17,7 @@ from . import crypto
 from .extensions import db
 from .github import api, user_auth
 from .github.app_auth import GitHubError
-from .models import User, UserToken
+from .models import RosterEntry, User, UserToken
 
 log = logging.getLogger(__name__)
 
@@ -59,8 +59,25 @@ def sign_in(tokens: user_auth.TokenSet) -> User:
         user.email = email
     user.last_login_at = datetime.now(UTC)
     store_tokens(user, tokens)
+    _claim_roster_rows(user)
     db.session.commit()
     return user
+
+
+def _claim_roster_rows(user: User) -> None:
+    """Roster rows naming this login whose account id isn't known yet (the
+    lookup failed or was never made) get it now: signing in proves the
+    login is theirs, and the id keeps matching after a rename."""
+    rows = db.session.scalars(
+        db.select(RosterEntry).where(
+            RosterEntry.github_user_id.is_(None),
+            db.func.lower(RosterEntry.github_login) == user.login.lower(),
+        )
+    )
+    for row in rows:
+        row.github_user_id = user.github_id
+        row.github_login = user.login
+        row.github_status = "ok"
 
 
 def store_tokens(user: User, tokens: user_auth.TokenSet) -> None:

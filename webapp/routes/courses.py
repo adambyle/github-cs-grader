@@ -7,7 +7,7 @@ Courses and their offerings (semesters).
     POST /courses/<id>/offerings              add a semester
     POST /courses/<id>/staff                  add a co-instructor (owner only)
     POST /courses/<id>/staff/<user>/remove    remove someone else from the staff (owner only)
-    GET  /offerings/<id>                      the offering page (staff only, for now)
+    GET  /offerings/<id>                      the offering page (staff; students: routes/student.py)
     POST /offerings/<id>/delete               delete a semester (owner only)
 """
 
@@ -17,10 +17,11 @@ import logging
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from .. import auth
+from .. import auth, membership
 from ..access import (
     course_staff_required,
     instructor_mode_required,
+    offering_member_required,
     offering_staff_required,
     staff_role,
 )
@@ -28,6 +29,7 @@ from ..extensions import db
 from ..github import api, installations
 from ..github.app_auth import GitHubError
 from ..models import Course, CourseStaff, Offering, User
+from . import roster, student
 
 log = logging.getLogger(__name__)
 
@@ -125,8 +127,12 @@ def remove_staff(course_id, user_id):
 
 
 @bp.get("/offerings/<int:offering_id>")
-@offering_staff_required
+@offering_member_required
 def offering(offering_id):
+    # Staff see the student page too when they're on the roster and in
+    # student mode (a TA taking another course, or the test ritual).
+    if g.entry is not None and (g.staff_role is None or g.user.mode == "student"):
+        return student.offering_page()
     choices, choices_error = [], None
     if g.offering.installation is None or g.offering.installation.state == "removed":
         choices, choices_error = _installable_orgs()
@@ -136,6 +142,8 @@ def offering(offering_id):
         course=g.course,
         choices=choices,
         choices_error=choices_error,
+        roster_counts=roster.counts(g.offering),
+        members=membership.summary(g.offering),
     )
 
 

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Roster · {{ course.code }} {{ offering.label }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> / <a href="{{ url_for('courses.course', course_id=course.id) }}">{{ course.code }}</a> / <a href="{{ url_for('courses.offering', offering_id=offering.id) }}">{{ offering.label }}</a> /</p>
+<div class="page-head">
+  <h1>Roster</h1>
+  <p class="row-links">
+    <a class="button secondary" href="{{ url_for('roster.new_entry', offering_id=offering.id) }}">Add person</a>
+    {% if counts.total %}<a class="button secondary" href="{{ url_for('roster.download', offering_id=offering.id) }}">Download roster</a>{% endif %}
+  </p>
+</div>
+
+{% if polling %}<div hidden data-poll-url="{{ url_for('roster.status', offering_id=offering.id) }}" data-poll-token="{{ poll_token }}"></div>{% endif %}
+
+<section class="panel">
+  <h2>GitHub organization</h2>
+  {% if connected %}
+    {% set m = members %}
+    <p>{{ m.active }} member{{ '' if m.active == 1 else 's' }}, {{ m.invited }} invited{% if m.not_invited %}, {{ m.not_invited }} not invited yet{% endif %}{% if m.failed %}, <span class="bad">{{ m.failed }} failed</span>{% endif %}{% if m.cannot %}; {{ m.cannot }} can't be invited until they have a GitHub username that exists{% endif %}.</p>
+    {% if m.queued and resume_at %}
+      <p class="flash">GitHub limits how many invitations an organization can send (50 a day for new organizations on the free plan). {{ m.queued }} more will be sent automatically at {{ resume_at.strftime('%d %b %H:%M UTC') }}.</p>
+    {% elif m.queued %}
+      <p class="muted">Sending {{ m.queued }} invitation{{ '' if m.queued == 1 else 's' }}…</p>
+    {% endif %}
+    {% if m.not_invited %}
+    <form method="post" action="{{ url_for('roster.invite_all', offering_id=offering.id) }}" class="row"
+          data-confirm="Send invitations to join {{ offering.org_login }} to {{ m.not_invited }} {{ 'person' if m.not_invited == 1 else 'people' }}? GitHub emails each of them.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="primary">Send invitations ({{ m.not_invited }})</button>
+    </form>
+    {% endif %}
+    {% if m.removable %}
+    <form method="post" action="{{ url_for('roster.remove_dropped', offering_id=offering.id) }}" class="row"
+          data-confirm="Remove {{ m.removable }} dropped {{ 'person' if m.removable == 1 else 'people' }} from {{ offering.org_login }}? They lose access to its repositories.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button secondary">Remove dropped people from the organization ({{ m.removable }})</button>
+    </form>
+    {% endif %}
+  {% else %}
+    <p class="muted">Connect the offering's GitHub organization to send invitations.</p>
+  {% endif %}
+</section>
+
+<nav class="tabs">
+  <a href="{{ url_for('roster.page', offering_id=offering.id) }}" {% if show == '' %}aria-current="page"{% endif %}>Current ({{ counts.student + counts.test + counts.staff }})</a>
+  <a href="{{ url_for('roster.page', offering_id=offering.id, show='attention') }}" {% if show == 'attention' %}aria-current="page"{% endif %}>Needs a GitHub username ({{ counts.attention }})</a>
+  <a href="{{ url_for('roster.page', offering_id=offering.id, show='dropped') }}" {% if show == 'dropped' %}aria-current="page"{% endif %}>Dropped ({{ counts.dropped }})</a>
+  <a href="{{ url_for('roster.page', offering_id=offering.id, show='all') }}" {% if show == 'all' %}aria-current="page"{% endif %}>All ({{ counts.total }})</a>
+</nav>
+
+{% if entries %}
+<table>
+  <tr><th>Username</th><th>Name</th><th>Email</th><th>Section</th><th>GitHub</th><th>Role</th>{% if connected %}<th>Organization</th>{% endif %}<th></th></tr>
+  {% for e in entries %}
+  <tr{% if e.dropped_at %} class="muted"{% endif %}>
+    <td>{{ e.username }}</td>
+    <td>{{ e.display_name if (e.first_name or e.last_name) else '' }}</td>
+    <td>{{ e.email }}</td>
+    <td>{{ e.section }}</td>
+    <td>
+      {% if e.github_status == 'missing' %}<span class="muted">none yet</span>
+      {% elif e.github_status == 'ok' %}<a href="https://github.com/{{ e.github_login }}">{{ e.github_login }}</a> <span class="good" title="Found on GitHub">✓</span>
+      {% elif e.github_status == 'not_found' %}{{ e.github_login }} <span class="bad">⚠ not found</span>
+      {% else %}{{ e.github_login }} <span class="muted">not checked</span>{% endif %}
+    </td>
+    <td>{{ e.role }}{% if e.dropped_at %} · dropped{% endif %}</td>
+    {% if connected %}
+    <td>
+      {% if e.membership == 'active' %}<span class="good">member</span>
+      {% elif e.membership == 'invited' %}invited
+      {% elif e.membership == 'queued' %}<span class="muted">sending…</span>
+      {% elif e.membership == 'failed' %}<span class="bad" title="{{ e.membership_error }}">failed</span> <span class="muted">{{ e.membership_error }}</span>
+      {% elif e.membership == 'none' %}<span class="muted">not invited</span>
+      {% else %}<span class="muted">—</span>{% endif %}
+      {% if e.participates and e.github_status == 'ok' and e.membership in ('none', 'failed', 'unknown') %}
+      <form method="post" action="{{ url_for('roster.invite_one', offering_id=offering.id, entry_id=e.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">{{ 'Resend' if e.membership == 'failed' else 'Invite' }}</button>
+      </form>
+      {% endif %}
+      {% if e.dropped_at and e.membership in ('active', 'invited') %}
+      <form method="post" action="{{ url_for('roster.remove_one', offering_id=offering.id, entry_id=e.id, show=show) }}" class="inline"
+            data-confirm="Remove {{ e.display_name }} from {{ offering.org_login }}? They lose access to its repositories.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Remove from organization</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
+    <td class="actions">
+      <a href="{{ url_for('roster.edit_entry', offering_id=offering.id, entry_id=e.id) }}">Edit</a>
+      {% if e.dropped_at %}
+      <form method="post" action="{{ url_for('roster.restore_entry', offering_id=offering.id, entry_id=e.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Restore</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('roster.drop_entry', offering_id=offering.id, entry_id=e.id) }}" class="inline"
+            data-confirm="Mark {{ e.display_name }} as dropped?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Drop</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% elif counts.total %}
+<p class="muted">Nobody in this list.</p>
+{% endif %}
+
+<section class="panel">
+  <h2>Upload a roster CSV</h2>
+  <p>Columns: <code>username,first_name,last_name,email,section,github_id,role</code>. Only <code>username</code> is required.
+    <a href="{{ url_for('roster.blank', offering_id=offering.id) }}">Download a blank roster</a>.</p>
+  <form method="post" action="{{ url_for('roster.upload', offering_id=offering.id) }}" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="file" name="file" accept=".csv,text/csv" required>
+    <fieldset class="choices">
+      <label><input type="radio" name="mode" value="replace" checked> This file is the whole roster. People not in it are marked dropped.</label>
+      <label><input type="radio" name="mode" value="merge"> Only add and update. Nobody is dropped.</label>
+    </fieldset>
+    <div><button type="submit" class="primary">Preview changes</button></div>
+  </form>
+</section>
+{% endblock %}

@@ -160,10 +160,113 @@ class Offering(db.Model):
     label: Mapped[str] = mapped_column(String(64))
     installation_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("installations.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # Goes up by one with every roster change, so a preview made before the
+    # change can be recognized as out of date.
+    roster_revision: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Set when GitHub's invitation cap (or a rate limit) stopped the
+    # invitation task; it resumes by itself at this time.
+    invites_resume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When memberships were last read from GitHub (the roster page rereads
+    # them in the background at most every few minutes).
+    memberships_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     course: Mapped[Course] = relationship(back_populates="offerings")
     installation: Mapped[Installation | None] = relationship()
+    roster: Mapped[list[RosterEntry]] = relationship(
+        back_populates="offering", cascade="all, delete-orphan"
+    )
 
     @property
     def org_login(self) -> str | None:
         return self.installation.account_login if self.installation else None
+
+
+GITHUB_STATUSES = ("missing", "unchecked", "ok", "not_found")
+
+# unknown: never checked. none: not in the org. queued: an invitation is
+# about to be sent. invited: pending. active: a member. failed: GitHub
+# refused the invitation (membership_error says why).
+MEMBERSHIPS = ("unknown", "none", "queued", "invited", "active", "failed")
+
+
+class RosterEntry(db.Model):
+    """One person on an offering's roster: a row of the CLI's roster CSV.
+
+    `username` is the institution's identifier and never changes once saved
+    (repos are named after it). `github_login` is the GitHub username as
+    entered, replaced by GitHub's own capitalization once looked up, when
+    `github_user_id` is stored too. A dropped student is marked, not
+    deleted, so their history survives if they come back.
+    """
+
+    __tablename__ = "roster_entries"
+    __table_args__ = (UniqueConstraint("offering_id", "username_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    offering_id: Mapped[int] = mapped_column(ForeignKey("offerings.id", ondelete="CASCADE"))
+    username: Mapped[str] = mapped_column(String(100))
+    username_key: Mapped[str] = mapped_column(String(100))  # lowercased, for uniqueness
+    first_name: Mapped[str] = mapped_column(String(100), default="")
+    last_name: Mapped[str] = mapped_column(String(100), default="")
+    email: Mapped[str] = mapped_column(String(255), default="")
+    section: Mapped[str] = mapped_column(String(50), default="")
+    role: Mapped[str] = mapped_column(String(16), default="student")
+    github_login: Mapped[str] = mapped_column(String(39), default="")
+    github_user_id: Mapped[int | None] = mapped_column(BigInteger)
+    github_status: Mapped[str] = mapped_column(String(16), default="missing")
+    membership: Mapped[str] = mapped_column(String(16), default="unknown", server_default="unknown")
+    membership_error: Mapped[str | None] = mapped_column(String(500))
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dropped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+    offering: Mapped[Offering] = relationship(back_populates="roster")
+
+    @property
+    def participates(self) -> bool:
+        """Gets invitations and repos: a student or test row, not dropped."""
+        return self.dropped_at is None and self.role in ("student", "test")
+
+    @property
+    def display_name(self) -> str:
+        return " ".join(x for x in (self.first_name, self.last_name) if x) or self.username
+
+    @property
+    def needs_attention(self) -> bool:
+        return self.dropped_at is None and self.github_status in ("missing", "not_found")
+
+    def csv_row(self) -> dict:
+        return {
+            "username": self.username,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "section": self.section,
+            "github_id": self.github_login,
+            "role": self.role,
+        }
+
+
+class RosterUpload(db.Model):
+    """An uploaded roster CSV and the preview made from it. Applying uses the
+    saved preview, so what was reviewed is exactly what is applied; and it
+    is refused if the roster changed since (`base_revision`)."""
+
+    __tablename__ = "roster_uploads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    offering_id: Mapped[int] = mapped_column(ForeignKey("offerings.id", ondelete="CASCADE"))
+    uploaded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    filename: Mapped[str] = mapped_column(String(255))
+    mode: Mapped[str] = mapped_column(String(16))  # "replace" or "merge"
+    base_revision: Mapped[int]
+    parsed: Mapped[dict] = mapped_column(JSON)
+    preview: Mapped[dict] = mapped_column(JSON)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    uploaded_by: Mapped[User] = relationship()

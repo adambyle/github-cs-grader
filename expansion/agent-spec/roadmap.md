@@ -14,13 +14,17 @@ they win, and this file should be updated.
 | # | Phase | Branch | Status | Spec |
 |---|---|---|---|---|
 | 0 | Development environment | `environment` | **Done** (merged) | `create-environment.md` |
-| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration` | **In progress**: steps 1–6 done, rosters next | `github-integration.md`, `roster.md` |
+| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration`, then `rosters` | **Done** (`rosters` awaiting merge) | `github-integration.md`, `roster.md` |
 | 2 | Assignments: upload, versions, verify, template, repos, patch | — | Planned | to write |
 | 3 | Grading: sandbox, queue, per-commit grades, deadlines | — | Planned | to write, with `sandboxing.md` |
 | 4 | Dashboards and export: instructor stats, student feedback, Moodle | — | Planned | to write |
 | 5 | Teams | — | Planned | to write |
 | 6 | Production hardening and deployment | — | Planned | `deploy.md` |
 | 7 | CLI client for the server (`cli.md`) | — | Later | — |
+
+**The current round** (`core-features.md`) finishes phase 1, builds phase 2
+without `verify`, builds phase 5 (teams), and the commits part of phase 4.
+Grading is left out on purpose.
 
 ### Phase 2: assignments
 
@@ -113,6 +117,14 @@ reason).
 | Store GitHub's numeric user ID once known | Logins can be renamed; IDs can't | `github-integration.md` |
 | TypeScript 6.0, not 7 | 7.0's watcher misses edits on Windows bind mounts | `create-environment.md` |
 | Ruff formats the Python | Consistency for a team | `pyproject.toml` |
+| Assignments belong to a course; per-semester settings (visible, due, teams, template) on `OfferingAssignment` | `goals.md`: assignments are reused between semesters | `core-features.md` §3.1 |
+| File contents stored once by SHA-256; a version is a list of paths | Every change is a version, cheaply | `core-features.md` §3.2 |
+| `assignment.json` is edited as a form, not stored as a file; the ZIP download writes it | One source of truth for the settings | `core-features.md` §3.3 |
+| Repo names `<a01>-starter`, `<a01>-<username>`, `<a01>-team-<slug>`, no course prefix | The org already names the course | `core-features.md` §5.1 |
+| No Actions workflow in templates for now | Grading will be server-side; decide in phase 3 | `core-features.md` §4.2 |
+| Teams are joined with a code, not picked from a list | A list lets anyone join any team's repo | `core-features.md` §6.1 |
+| "Late" means pushed after the due date (push webhook time), falling back to the commit date | Commit dates are set by the student's machine | `core-features.md` §7.2 |
+| Keep `coursekit/` until the end of phase 3, then remove it | Phase 3 ports its grader harness | `core-features.md` §10 |
 
 ## What the CLI got right (keep it in the web app)
 
@@ -184,7 +196,5 @@ way.
 - **IT answers** (`deploy.md` §4): public vs. campus-only, inbound webhooks
   (`webhooks.md`: GitHub needs HTTPS access), Docker socket policy, a separate
   grading VM, FERPA.
-- **Whether the App can accept an org invitation on a student's behalf** with their
-  user token. GitHub's docs say yes; confirm in phase 1, step 9.
 - **Whether the Actions tick stays.** Server-side grading makes it optional.
   Decide in phase 3.

@@ -55,7 +55,16 @@
 
 <section class="panel">
   <h2>Roster</h2>
-  <p class="muted">Uploading a roster comes next.</p>
+  {% set c = roster_counts %}
+  {% if c.total %}
+    <p>{{ c.student }} student{{ '' if c.student == 1 else 's' }}{% if c.test %}, {{ c.test }} test account{{ '' if c.test == 1 else 's' }}{% endif %}{% if c.staff %}, {{ c.staff }} staff{% endif %}{% if c.dropped %}, {{ c.dropped }} dropped{% endif %}{% if c.attention %}; <span class="bad">{{ c.attention }} need{{ 's' if c.attention == 1 else '' }} a GitHub username</span>{% endif %}</p>
+    {% if inst and inst.state == 'connected' %}
+    <p>In {{ inst.account_login }}: {{ members.active }} member{{ '' if members.active == 1 else 's' }}, {{ members.invited }} invited{% if members.not_invited %}, {{ members.not_invited }} not invited yet{% endif %}{% if members.failed %}, <span class="bad">{{ members.failed }} failed</span>{% endif %}.</p>
+    {% endif %}
+  {% else %}
+    <p class="muted">No roster yet.</p>
+  {% endif %}
+  <p><a class="button secondary" href="{{ url_for('roster.page', offering_id=offering.id) }}">{{ 'Roster' if c.total else 'Upload a roster' }}</a></p>
 </section>
 
 {% if g.staff_role == 'owner' %}

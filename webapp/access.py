@@ -22,7 +22,7 @@ from functools import wraps
 from flask import abort, g, redirect, request, session, url_for
 
 from .extensions import db
-from .models import Course, CourseStaff, Offering, User
+from .models import Course, CourseStaff, Offering, RosterEntry, User
 
 
 def may_use_instructor_mode(user: User) -> bool:
@@ -104,6 +104,64 @@ def course_staff_required(view):
         if role is None:
             abort(404)
         g.course, g.staff_role = course, role
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def roster_entry(user: User, offering: Offering) -> RosterEntry | None:
+    """The user's row on an offering's roster (not dropped), or None."""
+    for e in offering.roster:
+        if e.dropped_at is None and matches(user, e):
+            return e
+    return None
+
+
+def matches(user: User, entry: RosterEntry) -> bool:
+    """Is this roster row this person? By GitHub's numeric id when the row
+    has one (it survives renames), otherwise by username."""
+    if entry.github_user_id is not None:
+        return entry.github_user_id == user.github_id
+    return bool(entry.github_login) and entry.github_login.lower() == user.login.lower()
+
+
+def student_entries(user: User) -> list[RosterEntry]:
+    """Every roster row (not dropped) that is this person, newest offering
+    first."""
+    rows = db.session.scalars(
+        db.select(RosterEntry)
+        .join(Offering)
+        .where(
+            RosterEntry.dropped_at.is_(None),
+            db.or_(
+                RosterEntry.github_user_id == user.github_id,
+                db.and_(
+                    RosterEntry.github_user_id.is_(None),
+                    db.func.lower(RosterEntry.github_login) == user.login.lower(),
+                ),
+            ),
+        )
+        .order_by(Offering.created_at.desc())
+    )
+    return list(rows)
+
+
+def offering_member_required(view):
+    """For routes with <int:offering_id> that students use: sets g.offering,
+    g.course, g.staff_role (None for students) and g.entry (their roster
+    row, or None for staff), or 404s."""
+
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        offering = db.session.get(Offering, kwargs["offering_id"])
+        if offering is None:
+            abort(404)
+        role = staff_role(g.user, offering.course)
+        entry = roster_entry(g.user, offering)
+        if role is None and entry is None:
+            abort(404)
+        g.offering, g.course, g.staff_role, g.entry = offering, offering.course, role, entry
         return view(*args, **kwargs)
 
     return wrapped

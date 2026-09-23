@@ -3,7 +3,8 @@ user's mode. The lists fill in as courses and rosters arrive."""
 
 from flask import Blueprint, g, render_template, request
 
-from ..access import safe_next, staff_courses
+from ..access import safe_next, staff_courses, student_entries
+from . import student
 
 bp = Blueprint("home", __name__)
 
@@ -14,4 +15,7 @@ def index():
         return render_template("landing.html", next=safe_next(request.args.get("next")))
     if g.user.mode == "instructor":
         return render_template("home_instructor.html", courses=staff_courses(g.user))
-    return render_template("home_student.html")
+    entries = student_entries(g.user)
+    for entry in entries:
+        student.refresh_membership(entry)
+    return render_template("home_student.html", entries=entries)
