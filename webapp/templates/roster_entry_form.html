@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' ~ entry.username if entry else 'Add person' }} · {{ course.code }} {{ offering.label }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> / <a href="{{ url_for('courses.course', course_id=course.id) }}">{{ course.code }}</a> / <a href="{{ url_for('courses.offering', offering_id=offering.id) }}">{{ offering.label }}</a> / <a href="{{ url_for('roster.page', offering_id=offering.id) }}">Roster</a> /</p>
+<h1>{{ 'Edit ' ~ entry.username if entry else 'Add person' }}</h1>
+<form method="post" class="stack"
+      action="{{ url_for('roster.update_entry', offering_id=offering.id, entry_id=entry.id) if entry else url_for('roster.create_entry', offering_id=offering.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if entry %}
+    <p><strong>Username:</strong> {{ entry.username }} <span class="muted">(can't be changed: repos are named after it)</span></p>
+  {% else %}
+    <label>Username <input name="username" value="{{ form.username or '' }}" required></label>
+  {% endif %}
+  <label>First name <input name="first_name" value="{{ form.first_name or '' }}"></label>
+  <label>Last name <input name="last_name" value="{{ form.last_name or '' }}"></label>
+  <label>Email <input name="email" type="email" value="{{ form.email or '' }}"></label>
+  <label>Section <input name="section" value="{{ form.section or '' }}"></label>
+  <label>GitHub username <input name="github_id" value="{{ form.github_id or '' }}" placeholder="blank if not known yet"></label>
+  <label>Role
+    <select name="role">
+      {% for r in roles %}<option value="{{ r }}" {% if form.role == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </label>
+  <div><button type="submit" class="primary">{{ 'Save' if entry else 'Add' }}</button>
+    <a class="button secondary" href="{{ url_for('roster.page', offering_id=offering.id) }}">Cancel</a></div>
+</form>
+{% endblock %}

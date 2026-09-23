@@ -28,6 +28,7 @@ from ..extensions import db
 from ..github import api, installations
 from ..github.app_auth import GitHubError
 from ..models import Course, CourseStaff, Offering, User
+from . import roster
 
 log = logging.getLogger(__name__)
 
@@ -136,6 +137,7 @@ def offering(offering_id):
         course=g.course,
         choices=choices,
         choices_error=choices_error,
+        roster_counts=roster.counts(g.offering),
     )
 
 

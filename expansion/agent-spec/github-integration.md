@@ -381,7 +381,7 @@ step, stop and hand it to Adam to test before starting the next.**
 | 4 | `Installation`, the webhook dispatcher and installation handlers, `/dev/github` syncing the database | **Done**, tested by Adam |
 | 5 | `Course`/`CourseStaff`/`Offering` and pages | **Done**, tested by Adam |
 | 6 | The connect flow: install redirect, setup URL check, choosing an existing installation, org panel states | **Done**, tested by Adam |
-| 7 | Rosters: `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one row | **Next**. Detailed plan: `roster.md` |
+| 7 | Rosters: `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one row | **Built**, awaiting Adam's test. Plan: `roster.md` |
 | 8 | Membership checks, the invitation task with backoff, `organization.*` handlers, the nightly recheck | Planned |
 | 9 | The student home page, the join banner, the Join action | Planned |
 | 10 | The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission changed | Planned |

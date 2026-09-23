@@ -64,3 +64,21 @@ def user_installations(user_token: str) -> list[dict]:
     GitHub's recommended way to check a setup-URL installation_id really
     belongs to the person who arrived with it. [user token]"""
     return _get_all(user_token, "/user/installations", key="installations")
+
+
+def lookup_user(token: str, login: str) -> dict | None:
+    """A GitHub account by username: {"id", "login"} with GitHub's
+    capitalization, or None if there's no such account. Public data, so any
+    token will do; the roster uses the instructor's. [user token]"""
+    try:
+        resp = httpx.get(
+            f"{API}/users/{login}",
+            headers={**HEADERS, "Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+    except httpx.HTTPError as exc:
+        raise GitHubError(f"could not reach GitHub: {exc}") from exc
+    if resp.status_code == 404:
+        return None
+    data = _json_or_raise(resp)
+    return {"id": data["id"], "login": data["login"]}
