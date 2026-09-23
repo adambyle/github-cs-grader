@@ -53,6 +53,45 @@ test.** Each step ends with a short test list.
 | 10 | **Patch**: push changed restore-list files to existing repos, with a preview | `assignments` |
 | 11 | End-to-end test with `examples/`; update the README, `roadmap.md` | `assignments` |
 
+### Progress
+
+| # | Status |
+|---|---|
+| 1 | **Done**, tested by Adam (2026-09-23) |
+| 2 | **Done**, tested by Adam |
+| 3 | **Done**, tested by Adam. Join works with the student's token (spike S2 confirmed) |
+| 4 | **Next.** Start by branching `assignments` from `main` once `rosters` is merged |
+| 5–11 | Planned |
+
+### Notes for whoever builds step 4
+
+- **What's needed first:** new requirements `markdown-it-py` and `nh3` (Markdown,
+  sanitized) and `tzdata` (for `TIMEZONE` in step 6). New settings
+  `FILE_STORAGE` (default `/data/files`) and a Flask `MAX_CONTENT_LENGTH` of
+  50 MB. Tests point `FILE_STORAGE` at `tmp_path`.
+- **Scope of step 4 alone:** the `Assignment`, `AssignmentVersion` and
+  `StoredFile` models; New assignment (upload an assignment-folder ZIP, or start
+  empty); the file tree and file pages; upload files into a folder; remove a
+  file or folder; the version list; download a version as a ZIP. The
+  course-folder import, the settings form and the checks panel are step 5.
+- **Where the course page lists assignments:** a new Assignments section on
+  `course.html`, above Offerings.
+- **The CLI rules to copy** (not import) are in `coursekit/assignment.py`:
+  `SKIP_NAMES`, `SKIP_SUFFIXES`, `INFORMATIONAL`, `keep()`, `starter_files()`,
+  `restore_names()`, `problems()`, and `ASSIGNMENT_ID_RE` for the id.
+- **Things already built that later steps reuse:**
+  - `membership.py`: `org_token(offering)` for an installation token, and
+    `can_invite`/`participates` for who gets repos.
+  - `access.offering_member_required`: sets `g.entry` for students.
+  - `routes/student.py` and `offering_student.html`: the student offering page,
+    whose Assignments section is a placeholder for step 7.
+  - The `data-poll-url`/`data-poll-token` reload in `frontend/src/main.ts`,
+    for "Creating your repository…" in step 7.
+  - The `ORG`, `fake_org` and `org_offering` test fixtures in
+    `tests_web/conftest.py`.
+- **Grant repo access on `member_added`** (§5.4): the hook for it is
+  `membership.from_webhook`, which step 7 should extend.
+
 Steps 1–3 are already specified (`roster.md`, `github-integration.md`), so this
 file only adds what they didn't settle (§2). Steps 4–10 are new and specified
 below.

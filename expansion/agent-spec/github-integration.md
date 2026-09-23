@@ -383,8 +383,8 @@ step, stop and hand it to Adam to test before starting the next.**
 | 6 | The connect flow: install redirect, setup URL check, choosing an existing installation, org panel states | **Done**, tested by Adam |
 | 7 | Rosters: `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one row | **Done**, tested by Adam. Plan: `roster.md` |
 | 8 | Membership checks, the invitation task with backoff, `organization.*` handlers, the nightly recheck | **Done**, tested by Adam |
-| 9 | The student home page, the join banner, the Join action | **Built**, awaiting Adam's test (answers S2) |
-| 10 | The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission changed | Planned |
+| 9 | The student home page, the join banner, the Join action | **Done**, tested by Adam |
+| 10 | The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission changed | **Done**: covered by Adam's tests of steps 7–9. No permission changed |
 
 ### Where the build departed from this plan (steps 1–6)
 
@@ -407,6 +407,6 @@ step, stop and hand it to Adam to test before starting the next.**
 | Spike | Result | Consequence |
 |---|---|---|
 | S1 | Works end to end with the dev App, including PKCE (GitHub supports S256) and the first-time consent screen and Cancel. Adam tested it | None |
-| S2 | GitHub's permissions table lists `PATCH /user/memberships/orgs/{org}` as usable with a user token under Members: write. **Not yet tried for real** | Confirm in step 9. Keep the link to GitHub's invitation page as a fallback |
+| S2 | **Works.** `PATCH /user/memberships/orgs/{org}` with the student's user token accepts their invitation (Adam tested it in step 9, 2026-09-23) | The Join button uses it. The link to GitHub's invitation page stays as a fallback |
 | S3 | From GitHub's docs: **50 invitations per 24 hours** when the org is under a month old **and** on the free plan; otherwise 500 | Every new course org starts at 50. A class bigger than that needs the step 8 backoff on day one |
 | S4 | Not tested. Settled by rule instead: coursekit asks for **All repositories** and warns on the offering page when an org has selected repos only | Revisit only if an instructor needs "selected repositories" |

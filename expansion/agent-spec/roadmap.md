@@ -14,7 +14,7 @@ they win, and this file should be updated.
 | # | Phase | Branch | Status | Spec |
 |---|---|---|---|---|
 | 0 | Development environment | `environment` | **Done** (merged) | `create-environment.md` |
-| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration`, then `rosters` | **In progress**: steps 1–6 done, rosters and invitations done, student side built (awaiting test) | `github-integration.md`, `roster.md` |
+| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration`, then `rosters` | **Done** (`rosters` awaiting merge) | `github-integration.md`, `roster.md` |
 | 2 | Assignments: upload, versions, verify, template, repos, patch | — | Planned | to write |
 | 3 | Grading: sandbox, queue, per-commit grades, deadlines | — | Planned | to write, with `sandboxing.md` |
 | 4 | Dashboards and export: instructor stats, student feedback, Moodle | — | Planned | to write |
@@ -196,7 +196,5 @@ way.
 - **IT answers** (`deploy.md` §4): public vs. campus-only, inbound webhooks
   (`webhooks.md`: GitHub needs HTTPS access), Docker socket policy, a separate
   grading VM, FERPA.
-- **Whether the App can accept an org invitation on a student's behalf** with their
-  user token. GitHub's docs say yes; confirm in phase 1, step 9.
 - **Whether the Actions tick stays.** Server-side grading makes it optional.
   Decide in phase 3.
