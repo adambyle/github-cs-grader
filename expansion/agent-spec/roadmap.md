@@ -14,7 +14,7 @@ they win, and this file should be updated.
 | # | Phase | Branch | Status | Spec |
 |---|---|---|---|---|
 | 0 | Development environment | `environment` | **Done** (merged) | `create-environment.md` |
-| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration`, then `rosters` | **In progress**: steps 1–6 done, rosters built (awaiting test) | `github-integration.md`, `roster.md` |
+| 1 | GitHub integration: sign-in, roles, orgs, roster, invitations | `github-integration`, then `rosters` | **In progress**: steps 1–6 done, rosters done, invitations built (awaiting test) | `github-integration.md`, `roster.md` |
 | 2 | Assignments: upload, versions, verify, template, repos, patch | — | Planned | to write |
 | 3 | Grading: sandbox, queue, per-commit grades, deadlines | — | Planned | to write, with `sandboxing.md` |
 | 4 | Dashboards and export: instructor stats, student feedback, Moodle | — | Planned | to write |

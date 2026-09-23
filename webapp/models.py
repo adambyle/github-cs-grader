@@ -163,6 +163,12 @@ class Offering(db.Model):
     # Goes up by one with every roster change, so a preview made before the
     # change can be recognized as out of date.
     roster_revision: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Set when GitHub's invitation cap (or a rate limit) stopped the
+    # invitation task; it resumes by itself at this time.
+    invites_resume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When memberships were last read from GitHub (the roster page rereads
+    # them in the background at most every few minutes).
+    memberships_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     course: Mapped[Course] = relationship(back_populates="offerings")
     installation: Mapped[Installation | None] = relationship()
@@ -176,6 +182,11 @@ class Offering(db.Model):
 
 
 GITHUB_STATUSES = ("missing", "unchecked", "ok", "not_found")
+
+# unknown: never checked. none: not in the org. queued: an invitation is
+# about to be sent. invited: pending. active: a member. failed: GitHub
+# refused the invitation (membership_error says why).
+MEMBERSHIPS = ("unknown", "none", "queued", "invited", "active", "failed")
 
 
 class RosterEntry(db.Model):
@@ -203,6 +214,10 @@ class RosterEntry(db.Model):
     github_login: Mapped[str] = mapped_column(String(39), default="")
     github_user_id: Mapped[int | None] = mapped_column(BigInteger)
     github_status: Mapped[str] = mapped_column(String(16), default="missing")
+    membership: Mapped[str] = mapped_column(String(16), default="unknown", server_default="unknown")
+    membership_error: Mapped[str | None] = mapped_column(String(500))
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dropped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
@@ -210,6 +225,11 @@ class RosterEntry(db.Model):
     )
 
     offering: Mapped[Offering] = relationship(back_populates="roster")
+
+    @property
+    def participates(self) -> bool:
+        """Gets invitations and repos: a student or test row, not dropped."""
+        return self.dropped_at is None and self.role in ("student", "test")
 
     @property
     def display_name(self) -> str:

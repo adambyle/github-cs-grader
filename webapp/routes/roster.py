@@ -22,6 +22,7 @@ exist, with the instructor's own token.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -39,13 +40,14 @@ from flask import (
     url_for,
 )
 
-from .. import auth
+from .. import auth, membership
 from .. import roster as rostermod
 from ..access import offering_staff_required
 from ..extensions import db
 from ..github import api
 from ..github.app_auth import GitHubError
 from ..models import RosterEntry, RosterUpload
+from ..tasks import check_memberships, send_invitations
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +88,10 @@ def check_logins(logins: list[str]) -> tuple[dict, str | None]:
 
 def set_github(entry: RosterEntry, login: str, lookups: dict) -> None:
     """Store a GitHub username on an entry, with what the lookup found."""
+    if login.lower() != (entry.github_login or "").lower():
+        # A different account: what was known about the old one's
+        # membership doesn't apply.
+        entry.membership, entry.membership_error, entry.invited_at = "unknown", None, None
     entry.github_login = login
     entry.github_user_id = None
     if not login:
@@ -124,6 +130,13 @@ def page(offering_id):
         shown = entries
     else:
         show, shown = "", [e for e in entries if e.dropped_at is None]
+    checking = membership.check_due(g.offering)
+    if checking:
+        g.offering.memberships_checked_at = datetime.now(UTC)
+        db.session.commit()
+        check_memberships(g.offering.id)
+    members = membership.summary(g.offering)
+    inst = g.offering.installation
     return render_template(
         "roster.html",
         offering=g.offering,
@@ -131,7 +144,26 @@ def page(offering_id):
         entries=shown,
         show=show,
         counts=counts(g.offering),
+        members=members,
+        connected=inst is not None and inst.state == "connected",
+        polling=checking or members["queued"] > 0,
+        poll_token=_status_token(g.offering),
+        resume_at=membership.aware(g.offering.invites_resume_at),
     )
+
+
+def _status_token(offering) -> str:
+    """Changes whenever anything the roster page shows changes, so the
+    page can reload itself while invitations go out."""
+    parts = [str(offering.roster_revision), str(offering.invites_resume_at)]
+    parts += [f"{e.id}:{e.membership}:{e.github_status}" for e in offering.roster]
+    return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
+
+
+@bp.get("/offerings/<int:offering_id>/roster/status.json")
+@offering_staff_required
+def status(offering_id):
+    return {"token": _status_token(g.offering)}
 
 
 def counts(offering) -> dict:
@@ -434,6 +466,89 @@ def restore_entry(offering_id, entry_id):
         _bump(g.offering)
         db.session.commit()
         flash(f"Restored {entry.display_name}.")
+    return redirect(url_for("roster.page", offering_id=offering_id, show="dropped"))
+
+
+# -- the GitHub org -------------------------------------------------------------
+
+
+def _org_problem() -> str | None:
+    inst = g.offering.installation
+    if inst is None or inst.state == "removed":
+        return "Connect the offering's GitHub organization first."
+    if inst.state == "suspended":
+        return f"coursekit is suspended on {inst.account_login}."
+    return None
+
+
+@bp.post("/offerings/<int:offering_id>/roster/invitations")
+@offering_staff_required
+def invite_all(offering_id):
+    problem = _org_problem()
+    if problem:
+        flash(problem)
+        return redirect(url_for("roster.page", offering_id=offering_id))
+    n = membership.queue(membership.to_invite(g.offering))
+    db.session.commit()
+    if n:
+        send_invitations(g.offering.id)
+        flash(f"Sending {n} invitation{'' if n == 1 else 's'}.")
+    else:
+        flash("Everyone who can be invited already has been.")
+    return redirect(url_for("roster.page", offering_id=offering_id))
+
+
+@bp.post("/offerings/<int:offering_id>/roster/entries/<int:entry_id>/invite")
+@offering_staff_required
+def invite_one(offering_id, entry_id):
+    entry = _entry(entry_id)
+    problem = _org_problem()
+    if problem is None and not membership.can_invite(entry):
+        problem = f"{entry.display_name} can't be invited: they need a GitHub username that exists."
+    if problem is None and entry.membership in ("invited", "active"):
+        problem = f"{entry.display_name} is already {entry.membership}."
+    if problem:
+        flash(problem)
+        return redirect(url_for("roster.page", offering_id=offering_id))
+    membership.queue([entry])
+    db.session.commit()
+    send_invitations(g.offering.id)
+    flash(f"Sending an invitation to {entry.display_name}.")
+    return redirect(url_for("roster.page", offering_id=offering_id))
+
+
+def _remove(entries: list[RosterEntry]) -> list[str]:
+    """Remove people from the org; returns error messages."""
+    errors = []
+    for e in entries:
+        try:
+            membership.remove(g.offering, e)
+        except (GitHubError, membership.NotConnected) as exc:
+            db.session.rollback()
+            errors.append(f"{e.username}: {exc}")
+    return errors
+
+
+@bp.post("/offerings/<int:offering_id>/roster/entries/<int:entry_id>/remove")
+@offering_staff_required
+def remove_one(offering_id, entry_id):
+    entry = _entry(entry_id)
+    errors = _remove([entry])
+    flash(errors[0] if errors else f"Removed {entry.display_name} from the organization.")
+    return redirect(
+        url_for("roster.page", offering_id=offering_id, show=request.args.get("show", ""))
+    )
+
+
+@bp.post("/offerings/<int:offering_id>/roster/remove-dropped")
+@offering_staff_required
+def remove_dropped(offering_id):
+    entries = membership.removable(g.offering)
+    errors = _remove(entries)
+    for error in errors:
+        flash(error)
+    done = len(entries) - len(errors)
+    flash(f"Removed {done} dropped {'person' if done == 1 else 'people'} from the organization.")
     return redirect(url_for("roster.page", offering_id=offering_id, show="dropped"))
 
 

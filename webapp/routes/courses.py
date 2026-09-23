@@ -17,7 +17,7 @@ import logging
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from .. import auth
+from .. import auth, membership
 from ..access import (
     course_staff_required,
     instructor_mode_required,
@@ -138,6 +138,7 @@ def offering(offering_id):
         choices=choices,
         choices_error=choices_error,
         roster_counts=roster.counts(g.offering),
+        members=membership.summary(g.offering),
     )
 
 
