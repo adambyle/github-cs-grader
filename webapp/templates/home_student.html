@@ -2,6 +2,25 @@
 {% block title %}Courses · coursekit{% endblock %}
 {% block content %}
 <h1>Your courses</h1>
+{% if entries %}
+<table>
+  <tr><th>Course</th><th>Semester</th><th>GitHub organization</th></tr>
+  {% for e in entries %}
+  {% set o = e.offering %}
+  <tr>
+    <td><a href="{{ url_for('courses.offering', offering_id=o.id) }}">{{ o.course.code }} · {{ o.course.title }}</a></td>
+    <td>{{ o.label }}</td>
+    <td>
+      {% if not (o.installation and o.installation.state == 'connected') %}<span class="muted">not set up yet</span>
+      {% elif e.membership == 'active' %}{{ o.org_login }} <span class="good">· member</span>
+      {% elif e.membership == 'invited' %}{{ o.org_login }} · <a href="{{ url_for('courses.offering', offering_id=o.id) }}"><strong>join</strong></a>
+      {% else %}{{ o.org_login }} <span class="muted">· not invited yet</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
 <p class="muted">You're signed in as <strong>{{ g.user.login }}</strong>, but no course lists that GitHub account yet.
   If you expected one, ask your instructor to check the roster.</p>
+{% endif %}
 {% endblock %}

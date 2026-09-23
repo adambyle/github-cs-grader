@@ -382,8 +382,8 @@ step, stop and hand it to Adam to test before starting the next.**
 | 5 | `Course`/`CourseStaff`/`Offering` and pages | **Done**, tested by Adam |
 | 6 | The connect flow: install redirect, setup URL check, choosing an existing installation, org panel states | **Done**, tested by Adam |
 | 7 | Rosters: `RosterEntry`, CSV parsing ported from the CLI, preview and confirm, editing one row | **Done**, tested by Adam. Plan: `roster.md` |
-| 8 | Membership checks, the invitation task with backoff, `organization.*` handlers, the nightly recheck | **Built**, awaiting Adam's test |
-| 9 | The student home page, the join banner, the Join action | Planned |
+| 8 | Membership checks, the invitation task with backoff, `organization.*` handlers, the nightly recheck | **Done**, tested by Adam |
+| 9 | The student home page, the join banner, the Join action | **Built**, awaiting Adam's test (answers S2) |
 | 10 | The manual end-to-end test; update `roadmap.md`, and `deploy.md` if a permission changed | Planned |
 
 ### Where the build departed from this plan (steps 1–6)

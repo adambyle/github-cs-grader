@@ -161,3 +161,12 @@ def remove_member(token: str, org: str, login: str) -> None:
     resp = _request(token, "DELETE", f"/orgs/{org}/memberships/{login}")
     if resp.status_code not in (204, 404):  # 404: already not a member
         _json_or_raise(resp)
+
+
+def accept_membership(user_token: str, org: str) -> str:
+    """Accept the signed-in person's pending invitation to an org, so they
+    needn't find GitHub's email. Returns the new state ('active'). Raises
+    GitHubError, e.g. 404 when there's no invitation to accept.
+    [user token; Members: write]"""
+    resp = _request(user_token, "PATCH", f"/user/memberships/orgs/{org}", json={"state": "active"})
+    return _json_or_raise(resp)["state"]

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ course.code }} {{ offering.label }} · coursekit{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('home.index') }}">Courses</a> /</p>
+<h1>{{ course.code }} · {{ course.title }} <span class="muted">{{ offering.label }}</span></h1>
+
+{% if not org %}
+  <p class="muted">Your instructor hasn't finished setting up this course on GitHub yet.</p>
+{% elif entry.membership == 'active' %}
+  <p>You're a member of <a href="https://github.com/{{ org }}">{{ org }}</a> on GitHub.</p>
+{% elif entry.membership == 'invited' %}
+  <section class="panel">
+    <h2>Join {{ org }}</h2>
+    <p>You've been invited to the course's GitHub organization. Join it to get your assignment repositories.</p>
+    <form method="post" action="{{ url_for('student.join', offering_id=offering.id) }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="primary">Join {{ org }}</button>
+      <a href="https://github.com/orgs/{{ org }}/invitation" target="_blank" rel="noopener">or accept it on GitHub</a>
+    </form>
+  </section>
+{% else %}
+  <p class="muted">You haven't been invited to the course's GitHub organization ({{ org }}) yet.
+    {% if entry.github_status != 'ok' %}Your instructor needs your GitHub username first: the roster has {{ entry.github_login or 'none' }}.{% endif %}</p>
+{% endif %}
+
+<h2>Assignments</h2>
+<p class="muted">No assignments yet.</p>
+{% endblock %}

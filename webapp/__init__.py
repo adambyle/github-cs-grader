@@ -39,6 +39,7 @@ def create_app(settings: dict | None = None) -> Flask:
     from .routes.health import bp as health_bp
     from .routes.home import bp as home_bp
     from .routes.roster import bp as roster_bp
+    from .routes.student import bp as student_bp
 
     app.before_request(load_current_user)
     app.after_request(_no_store_pages)
@@ -48,6 +49,7 @@ def create_app(settings: dict | None = None) -> Flask:
     app.register_blueprint(health_bp)
     app.register_blueprint(home_bp)
     app.register_blueprint(roster_bp)
+    app.register_blueprint(student_bp)
     app.register_blueprint(webhooks_bp)
     csrf.exempt(webhooks_bp)  # GitHub signs its requests instead
     if app.config["DEV_ROUTES"]:
